@@ -1,1 +1,1 @@
-{"version":2,"cleanUrls":true,"routes":[{"src":"/assets/(.*)","dest":"/client/assets/$1"},{"src":"/(.*)","dest":"/client/$1"}]}
+{"rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
