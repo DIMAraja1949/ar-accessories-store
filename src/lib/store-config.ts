@@ -1,0 +1,1 @@
+﻿export const STORE_OWNER_USER_ID = 'PASTE_OWNER_USER_ID_HERE'
