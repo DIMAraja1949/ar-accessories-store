@@ -1,1 +1,15 @@
-import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; import path from 'path'; export default defineConfig({ plugins: [react()], define: { 'process.env': {}, 'global': 'window' }, resolve: { alias: { 'node:async_hooks': path.resolve(__dirname, 'src/async-hooks-mock.ts'), 'async_hooks': path.resolve(__dirname, 'src/async-hooks-mock.ts') } }, build: { outDir: 'dist', emptyOutDir: true } });
+import { defineConfig } from 'vite'
+import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import viteReact from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import { nitro } from 'nitro/vite'
+import { fileURLToPath } from 'node:url'
+
+export default defineConfig({
+  plugins: [tanstackStart(), nitro(), viteReact(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+})
