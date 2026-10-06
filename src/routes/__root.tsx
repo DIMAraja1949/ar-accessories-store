@@ -33,7 +33,7 @@ const queryClient = new QueryClient()
  *
  * Note: this document is server-rendered. Any child that reads browser-only
  * state at render (localStorage, window, auth state) must be wrapped in the
- * client boundary component, otherwise the page can ship blank or mismatched.
+ * a ClientOnly boundary, otherwise the page can ship blank or mismatched.
  */
 export const Route = createRootRoute({
   head: () => ({

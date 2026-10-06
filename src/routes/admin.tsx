@@ -1,24 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { blink } from '@/blink/client'
-import { BlinkClientBoundary } from '@/components/BlinkClientBoundary'
+import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { loadStoredProducts, saveStoredProducts, type StoredProduct } from '@/lib/products-storage'
 
 const ADMIN_PASSWORD = 'Simo2026'
 const ADMIN_AUTH_KEY = 'ar-admin-auth' // نفس المفتاح المستعمل فـ index.tsx
 
-type ProductRow = {
-  id: string
-  userId?: string
-  name: string
-  category?: string
-  price: number
-  stock?: number
-  image: string
-  description?: string
-  createdAt?: string
-}
+type ProductRow = StoredProduct
 
 const emptyForm = { name: '', category: 'Phone Cases', price: '', stock: '10', image: '', description: '' }
 
@@ -58,7 +47,7 @@ function AdminDashboardRoute() {
   const loadProducts = useCallback(async () => {
     setListLoading(true)
     try {
-      const rows = (await blink.db.table<ProductRow>('products').list({ limit: 500 })) as ProductRow[]
+      const rows = loadStoredProducts()
       const sorted = [...rows].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
       setItems(sorted)
     } catch (error) {
@@ -96,17 +85,23 @@ function AdminDashboardRoute() {
       event.target.value = ''
       return
     }
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error('حجم الصورة كبير؛ اختار صورة أقل من 8 MB.')
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('حجم الصورة كبير؛ اختار صورة أقل من 3 MB.')
       event.target.value = ''
       return
     }
     setUploadingImage(true)
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
-      const { publicUrl } = await blink.storage.upload(file, `products/${Date.now()}-${safeName}`)
-      setForm(current => ({ ...current, image: publicUrl }))
-      toast.success('ترفعَت الصورة بنجاح.')
+      const image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => typeof reader.result === 'string'
+          ? resolve(reader.result)
+          : reject(new Error('تعذر قراءة ملف الصورة.'))
+        reader.onerror = () => reject(reader.error ?? new Error('تعذر قراءة ملف الصورة.'))
+        reader.readAsDataURL(file)
+      })
+      setForm(current => ({ ...current, image }))
+      toast.success('وجدات الصورة للحفظ محلياً.')
     } catch (error) {
       toast.error('ما قدرناش نرفعو الصورة', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
     } finally {
@@ -152,13 +147,13 @@ function AdminDashboardRoute() {
       description: form.description.trim(),
     }
     try {
-      const table = blink.db.table('products')
+      const rows = loadStoredProducts()
       if (editingId) {
-        await table.update(editingId, data)
+        saveStoredProducts(rows.map(row => row.id === editingId ? { ...row, ...data } : row))
         toast.success('تم تعديل المنتج بنجاح!')
       } else {
-        await table.create({ userId: 'store-admin', ...data })
-        toast.success('تم نشر المنتج بنجاح!', { description: 'غادي يبان فالمتجر من بعد التحديث.' })
+        saveStoredProducts([...rows, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...data }])
+        toast.success('تم نشر المنتج بنجاح!', { description: 'غادي يبان فالمتجر مباشرة.' })
       }
       cancelEdit()
       await loadProducts()
@@ -172,7 +167,7 @@ function AdminDashboardRoute() {
   const handleDelete = async (row: ProductRow) => {
     if (!window.confirm(`واش متأكد بغيتي تمسح "${row.name}"؟ ما يمكنش ترجع.`)) return
     try {
-      await blink.db.table('products').delete(row.id)
+      saveStoredProducts(loadStoredProducts().filter(product => product.id !== row.id))
       toast.success('تمسح المنتج.')
       if (editingId === row.id) cancelEdit()
       await loadProducts()
@@ -182,17 +177,19 @@ function AdminDashboardRoute() {
   }
 
   const importDemoProducts = async () => {
-    if (!window.confirm('غادي نضيفو 8 منتجات تجريبية لقاعدة البيانات باش تقدر تعدلهم وتمسحهم. نكملو؟')) return
+    if (!window.confirm('غادي نضيفو 8 منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟')) return
     setSeeding(true)
     try {
-      const table = blink.db.table('products')
-      const existing = new Set(items.map(item => item.name))
+      const rows = loadStoredProducts()
+      const existing = new Set(rows.map(item => item.name))
+      const addedProducts: ProductRow[] = []
       let added = 0
       for (const product of demoProducts) {
         if (existing.has(product.name)) continue
-        await table.create({ userId: 'store-admin', stock: 10, ...product })
+        addedProducts.push({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), stock: 10, ...product })
         added += 1
       }
+      saveStoredProducts([...rows, ...addedProducts])
       toast.success(added > 0 ? `تزادو ${added} منتجات.` : 'المنتجات التجريبية موجودة من قبل.')
       await loadProducts()
     } catch (error) {
@@ -203,12 +200,12 @@ function AdminDashboardRoute() {
   }
 
   if (!authReady) {
-    return <BlinkClientBoundary fallback={<div className="min-h-dvh animate-pulse bg-background" />}><div className="min-h-dvh bg-secondary/30" /></BlinkClientBoundary>
+    return <ClientOnly fallback={<div className="min-h-dvh animate-pulse bg-background" />}><div className="min-h-dvh bg-secondary/30" /></ClientOnly>
   }
 
   if (!isAuthed) {
     return (
-      <BlinkClientBoundary fallback={<div className="min-h-dvh animate-pulse bg-background" />}>
+      <ClientOnly fallback={<div className="min-h-dvh animate-pulse bg-background" />}>
         <main dir="rtl" className="grid min-h-dvh place-items-center bg-secondary/30 px-4 py-10 text-foreground">
           <form onSubmit={handleLogin} className="w-full max-w-sm rounded-3xl border border-border/80 bg-background p-7 shadow-xl sm:p-9">
             <span className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground"><Lock size={24}/></span>
@@ -232,12 +229,12 @@ function AdminDashboardRoute() {
             <a href="/" className="mt-4 block text-center text-xs font-semibold text-muted-foreground transition hover:text-foreground">العودة للمتجر</a>
           </form>
         </main>
-      </BlinkClientBoundary>
+      </ClientOnly>
     )
   }
 
   return (
-    <BlinkClientBoundary fallback={<div className="min-h-dvh animate-pulse bg-background" />}>
+    <ClientOnly fallback={<div className="min-h-dvh animate-pulse bg-background" />}>
       <main dir="rtl" className="min-h-dvh bg-secondary/30 text-foreground py-12 px-4 sm:px-8 font-sans">
         <div className="max-w-2xl mx-auto space-y-8">
 
@@ -289,7 +286,7 @@ function AdminDashboardRoute() {
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">صورة المنتج</label>
                 <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} className="w-full rounded-xl border border-input bg-background p-3 text-sm file:ml-3 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground" />
-                <p className="mt-2 text-[11px] text-muted-foreground">اختار صورة من جهازك (حتى 8 MB). كتترفع وكتتحفظ تلقائياً فالمتجر.</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">اختار صورة من جهازك (حتى 3 MB). كتتحفظ محلياً فهاد المتصفح.</p>
                 {uploadingImage && <p className="mt-2 text-xs text-primary">جاري رفع الصورة...</p>}
                 {form.image && <div className="mt-3 flex items-center gap-3 rounded-xl border border-border p-2"><img src={form.image} alt="معاينة صورة المنتج" className="h-16 w-16 rounded-lg object-cover"/><span className="text-xs text-muted-foreground">الصورة جاهزة</span></div>}
               </div>
@@ -360,11 +357,11 @@ function AdminDashboardRoute() {
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck size={15} className="text-primary" />
-            <span>الدخول محمي بكلمة المرور، والمنتجات كتتحفظ فقاعدة البيانات ديال المتجر.</span>
+            <span>الدخول محمي بكلمة المرور، والمنتجات كتتحفظ محلياً فهاد المتصفح.</span>
           </div>
 
         </div>
       </main>
-    </BlinkClientBoundary>
+    </ClientOnly>
   )
 }

@@ -1,14 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Banknote, CreditCard, Headphones, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, Star, Quote, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ClientOnly } from '@tanstack/react-router'
+import { ArrowRight, Banknote, Headphones, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe } from 'lucide-react'
 import { toast } from 'sonner'
-import { blink } from '@/blink/client'
-import { BlinkClientBoundary } from '@/components/BlinkClientBoundary'
-import type { OrdersRow } from '@/lib/db-types'
+import { loadStoredProducts } from '@/lib/products-storage'
 
 type Product = { id: string; name: string; nameEn: string; category: string; price: number; image: string; tag?: string; tagEn?: string; description: string; descriptionEn: string }
+type CartLine = { id: string; quantity: number }
 type CartItem = { product: Product; quantity: number }
-type StoreProductRow = { id: string; userId?: string; name: string; nameEn?: string; category?: string; price: number; stock?: number; image: string; tag?: string; tagEn?: string; description?: string; descriptionEn?: string }
+
+// Shop WhatsApp number (international format, no + or spaces)
+const WHATSAPP_NUMBER = '212610967239'
 
 const categories = ['All', 'Phone Cases', 'Smartwatches', 'Audio', 'Jewellery', 'Sneakers', 'Chargers']
 const categoryLabels: Record<string, { ar: string; en: string }> = {
@@ -20,123 +22,33 @@ const categoryLabels: Record<string, { ar: string; en: string }> = {
   Sneakers: { ar: 'أحذية', en: 'Sneakers' },
   Chargers: { ar: 'شواحن', en: 'Chargers' },
 }
-const products: Product[] = [
-  { 
-    id: 'case-01', 
-    name: 'Everyday Mag Case', 
-    nameEn: 'Everyday Mag Case',
-    category: 'Phone Cases', 
-    price: 249, 
-    image: 'https://images.unsplash.com/photo-1601592690120-a7cefd9c477a?auto=format&fit=crop&w=900&q=85', 
-    tag: 'الأكثر مبيعا', 
-    tagEn: 'BESTSELLER', 
-    description: 'كوري سليم وحامي مع لمسة مطفية مريحة للاستعمال اليومي.', 
-    descriptionEn: 'A slim, protective case with a clean matte finish and a comfortable grip for your daily carry.' 
-  },
-  { 
-    id: 'watch-01', 
-    name: 'ساعة ذكية نشطة', 
-    nameEn: 'Active Smartwatch',
-    category: 'Smartwatches', 
-    price: 899, 
-    image: 'https://images.unsplash.com/photo-1750776100861-30c172651817?auto=format&fit=crop&w=900&q=85', 
-    tag: 'جديد', 
-    tagEn: 'JUST IN', 
-    description: 'ساعة يومية متعددة الاستخدامات بشاشة واضحة وتتبع للنشاط طوال اليوم.', 
-    descriptionEn: 'A versatile everyday watch with a crisp display, activity tracking and a comfortable all-day band.' 
-  },
-  { 
-    id: 'jewel-01', 
-    name: 'سوار معدني مينيمالست', 
-    nameEn: 'Minimalist Steel Bracelet',
-    category: 'Jewellery', 
-    price: 349, 
-    image: 'https://images.unsplash.com/photo-1611591475871-2ee8ab22349a?auto=format&fit=crop&w=900&q=85', 
-    tag: 'رائج', 
-    tagEn: 'TRENDING', 
-    description: 'مصمم خصيصاً لأناقة يومية راقية من الستانلس ستيل.', 
-    descriptionEn: 'Crafted for men and women, a sleek stainless steel bracelet designed for daily elegance.' 
-  },
-  { 
-    id: 'jewel-02', 
-    name: 'خاتم فضي كلاسيكي', 
-    nameEn: 'Silver Signet Ring',
-    category: 'Jewellery', 
-    price: 299, 
-    image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=900&q=85', 
-    description: 'خاتم فضي مصقول بأسلوب كلاسيكي هادئ وراقي.', 
-    descriptionEn: 'A classic polished silver ring suited for a refined, understated look.' 
-  },
-  { 
-    id: 'sneaker-01', 
-    name: 'حذاء جلدي عصري', 
-    nameEn: 'Urban Leather Sneaker',
-    category: 'Sneakers', 
-    price: 1199, 
-    image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=900&q=85', 
-    tag: 'جديد', 
-    tagEn: 'NEW', 
-    description: 'أحذية جلدية فاخرة تجمع بين الراحة القصوى والتصميم الحضري النظيف.', 
-    descriptionEn: 'Premium leather sneakers combining ultimate comfort with clean urban styling.' 
-  },
-  { 
-    id: 'audio-01', 
-    name: 'سماعات استوديو برو', 
-    nameEn: 'Studio Buds Pro',
-    category: 'Audio', 
-    price: 549, 
-    image: 'https://images.unsplash.com/photo-1600375104627-c94c416deefa?auto=format&fit=crop&w=900&q=85', 
-    tag: 'اختيار مميز', 
-    tagEn: 'TOP PICK', 
-    description: 'سماعات لاسلكية مدمجة لمكالمات واضحة وصوت غني.', 
-    descriptionEn: 'Compact wireless earbuds made for clear calls, rich sound and a pocket-friendly commute.' 
-  },
-  { 
-    id: 'sneaker-02', 
-    name: 'سبادريل الجري الكلاسيكي', 
-    nameEn: 'Classic Runner Spadril',
-    category: 'Sneakers', 
-    price: 899, 
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85', 
-    description: 'حذاء رياضي خفيف مصمم للتمارين اليومية والمظهر العصري السهل.', 
-    descriptionEn: 'Lightweight sports sneakers engineered for daily workouts and effortless street style.' 
-  },
-  { 
-    id: 'charger-01', 
-    name: 'شاحن مكتب مغناطيسي', 
-    nameEn: 'Magnetic Desk Charger',
-    category: 'Chargers', 
-    price: 329, 
-    image: 'https://images.unsplash.com/photo-1642418714495-87fcca453f70?auto=format&fit=crop&w=900&q=85', 
-    description: 'رفيق شحن أنيق يحافظ على طاقة أجهزتك ومكتبك منظماً.', 
-    descriptionEn: 'A streamlined charging companion that keeps your everyday devices powered and your desk tidy.' 
-  },
-]
-
-const reviews = [
-  { id: 1, name: 'يوسف ب.', nameEn: 'Youssef B.', city: 'الدار البيضاء', cityEn: 'Casablanca', comment: 'السلعة وصلتني فالصباح، الجودة ناضية بزاف شكرا!', commentEn: 'Received my order in the morning, amazing quality thanks!', rating: 5 },
-  { id: 2, name: 'أيمن م.', nameEn: 'Aymen M.', city: 'الرباط', cityEn: 'Rabat', comment: 'التوصيل سريع لجميع المدن وخديت Cash on Delivery بدون مشاكل.', commentEn: 'Fast delivery to all cities and smooth Cash on Delivery.', rating: 5 },
-  { id: 3, name: 'كنزة ل.', nameEn: 'Kenza L.', city: 'مراكش', cityEn: 'Marrakech', comment: 'خدمة العملاء روعة والتوصيل مضمون 100% في كل المغرب.', commentEn: 'Top customer service and 100% reliable delivery across Morocco.', rating: 5 },
-]
 
 const formatPrice = (price: number) => `${price.toLocaleString('fr-MA')} DH`
 
 export const Route = createFileRoute('/')({
   head: () => ({ meta: [{ title: 'AR Accessories Co. — Troc, Tech & Lifestyle Maroc' }, { name: 'description', content: 'Discover thoughtfully selected accessories, jewellery, sneakers and tech with fast delivery across all cities in Morocco.' }] }),
-  component: () => <BlinkClientBoundary fallback={<div className="min-h-dvh animate-pulse bg-background" />}><Storefront /></BlinkClientBoundary>,
+  component: () => <ClientOnly fallback={<div className="min-h-dvh animate-pulse bg-background" />}><Storefront /></ClientOnly>,
 })
 
 function Storefront() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
-  const [cart, setCart] = useState<CartItem[]>(() => {
+  // The cart only stores product ids + quantities. Names and prices always come from saved products.
+  const [cartLines, setCartLines] = useState<CartLine[]>(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem('ar-cart') || '[]') as CartItem[]
-      return Array.isArray(parsed)
-        ? parsed.filter(item => item?.product?.id && Number.isFinite(item.quantity) && item.quantity > 0)
-        : []
+      const parsed = JSON.parse(localStorage.getItem('ar-cart') || '[]') as Array<{ id?: string; quantity?: number; product?: { id?: string } }>
+      if (!Array.isArray(parsed)) return []
+      return parsed.flatMap(item => {
+        const id = item?.id ?? item?.product?.id
+        const quantity = Number(item?.quantity)
+        return id && Number.isFinite(quantity) && quantity > 0
+          ? [{ id: String(id), quantity: Math.max(1, Math.min(99, Math.floor(quantity))) }]
+          : []
+      })
     } catch { return [] }
   })
   const [storeProducts, setStoreProducts] = useState<Product[]>([])
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [reloadKey, setReloadKey] = useState(0)
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'featured' | 'asc' | 'desc'>('featured')
@@ -146,60 +58,18 @@ function Storefront() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalPage, setModalPage] = useState<'none' | 'terms' | 'returns'>('none')
   const [busy, setBusy] = useState(false)
-  
-  // Optional Payment Gateway configuration
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'cmi'>('cod')
+
   const [customer, setCustomer] = useState({ name: '', phone: '', city: '', address: '', promoCode: '' })
-  const [appliedDiscount, setAppliedDiscount] = useState(0)
-  const [card, setCard] = useState({ cardholder: '', number: '', expiry: '', cvv: '' })
-  const [cardIsFlipped, setCardIsFlipped] = useState(false)
-  const [gatewayStep, setGatewayStep] = useState<'details' | 'processing' | 'success'>('details')
-  const orderReference = ''
-  const paymentAudioContext = useRef<AudioContext | null>(null)
+  const [appliedPromo, setAppliedPromo] = useState<'AR10' | 'FREESHIP' | null>(null)
 
-  const triggerPaymentFeedback = (kind: 'flip' | 'success') => {
-    // Vibration is supported by some mobile browsers; Web Audio is the fallback.
-    try {
-      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-        navigator.vibrate(kind === 'flip' ? 14 : [22, 36, 52])
-      }
-    } catch { /* Haptics are optional and may be blocked by the browser. */ }
+  useEffect(() => { localStorage.setItem('ar-cart', JSON.stringify(cartLines)) }, [cartLines])
 
-    if (typeof window === 'undefined' || typeof window.AudioContext === 'undefined') return
-    try {
-      const context = paymentAudioContext.current ?? new window.AudioContext()
-      paymentAudioContext.current = context
-      if (context.state === 'suspended') void context.resume().catch(() => {})
-
-      const now = context.currentTime
-      const tones = kind === 'flip'
-        ? [{ frequency: 690, start: 0, duration: 0.075, volume: 0.035 }]
-        : [{ frequency: 660, start: 0, duration: 0.11, volume: 0.04 }, { frequency: 880, start: 0.105, duration: 0.16, volume: 0.045 }]
-
-      tones.forEach(tone => {
-        const oscillator = context.createOscillator()
-        const gain = context.createGain()
-        oscillator.type = 'sine'
-        oscillator.frequency.setValueAtTime(tone.frequency, now + tone.start)
-        gain.gain.setValueAtTime(0.0001, now + tone.start)
-        gain.gain.exponentialRampToValueAtTime(tone.volume, now + tone.start + 0.012)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + tone.start + tone.duration)
-        oscillator.connect(gain)
-        gain.connect(context.destination)
-        oscillator.start(now + tone.start)
-        oscillator.stop(now + tone.start + tone.duration + 0.01)
-      })
-    } catch { /* Keep checkout usable when audio is unavailable or disallowed. */ }
-  }
-
-  useEffect(() => { localStorage.setItem('ar-cart', JSON.stringify(cart)) }, [cart])
-
-  // Load products saved from /admin. Built-in demo products are the fallback if the DB read fails.
+  // Load the products saved from /admin.
   useEffect(() => {
     let active = true
     const loadStoreProducts = async () => {
       try {
-        const rows = await blink.db.table<StoreProductRow>('products').list({ limit: 200 })
+        const rows = loadStoredProducts()
         const saved = rows
           .filter(row => row.name && row.image && Number.isFinite(Number(row.price)))
           .map((row, index): Product => ({
@@ -214,20 +84,32 @@ function Storefront() {
             description: row.description || '',
             descriptionEn: row.descriptionEn || row.description || '',
           }))
-        if (active) setStoreProducts(saved)
+        if (active) {
+          setStoreProducts(saved)
+          setLoadStatus('ready')
+        }
       } catch (error) {
         console.error('Failed to load products', error)
-        if (active) setStoreProducts(products)
+        if (active) setLoadStatus('error')
       }
     }
     void loadStoreProducts()
     return () => { active = false }
-  }, [])
+  }, [reloadKey])
+
+  // Remove cart lines whose product no longer exists (only after a successful load)
+  useEffect(() => {
+    if (loadStatus !== 'ready') return
+    setCartLines(current => {
+      const next = current.filter(line => storeProducts.some(product => product.id === line.id))
+      return next.length === current.length ? current : next
+    })
+  }, [loadStatus, storeProducts])
 
   const t = {
     ar: {
       topBanner: 'التوصيل لجميع مدن المغرب (الدار البيضاء، الرباط، مراكش، بني ملال وكل المدن)',
-      shippingNotice: 'الدفع عند الاستلام (COD) أو الأداء بالبطاقة (CMI)',
+      shippingNotice: 'الدفع عند الاستلام (COD): أدِّ ثمن طلبيتك عند وصولها',
       shopAll: 'تسوق الكل',
       jewellery: 'مجوهرات',
       sneakers: 'أحذية',
@@ -246,9 +128,11 @@ function Storefront() {
       chooseTaste: 'اختر ما يناسب ذوقك.',
       collectionsDesc: 'تشكيلة واسعة من المجوهرات، الأحذية، والأجهزة الذكية.',
       quickView: 'نظرة سريعة',
-      customerReviews: 'آراء الزبناء',
-      reviewsTitle: 'ثقة زبنائنا في كل المدن.',
-      reviewsDesc: 'تعرف على تجارب زبنائنا الكرام مع خدماتنا.',
+      loadingProducts: 'جاري تحميل المنتجات...',
+      loadError: 'تعذر تحميل المنتجات حالياً.',
+      loadErrorDesc: 'تحقق من الاتصال بالإنترنت وحاول مرة أخرى.',
+      retry: 'إعادة المحاولة',
+      noProducts: 'لا توجد منتجات حالياً.',
       addToCart: 'إضافة إلى السلة',
       continueShopping: 'متابعة التسوق',
       close: 'إغلاق',
@@ -256,8 +140,8 @@ function Storefront() {
       commitmentTitle: 'توصيل سريع لكل مدن المغرب. أمان وثقة تامة.',
       codTitle: 'الدفع عند الاستلام (COD)',
       codDesc: 'ادفع ثمن طلبيتك نقداً وبكل أمان فور وصولها لباب منزلك.',
-      onlinePayTitle: 'بوابة الدفع الإلكتروني (CMI)',
-      onlinePayDesc: 'اختر الأداء أونلاين عبر بوابة CMI الآمنة بالبطاقة البنكية.',
+      whatsappTitle: 'تأكيد الطلب عبر واتساب',
+      whatsappDesc: 'بعد إرسال طلبك نتواصل معك على واتساب لتأكيد التفاصيل وموعد التوصيل.',
       nationalCoverTitle: 'توصيل وطني شامل',
       nationalCoverDesc: 'نغطي جميع مدن وقرى المملكة المغربية بسرعة واحترافية.',
       footerDesc: 'متجرك المفضل للأكسسوارات والمجوهرات والأجهزة الذكية مع التوصيل لجميع المدن المغربية.',
@@ -266,7 +150,7 @@ function Storefront() {
       trustAndLegal: 'الثقة والقانون',
       termsOfService: 'شروط الخدمة',
       returnPolicy: 'سياسة الاسترجاع',
-      footerRights: '©️ 2026 AR Accessories Co. · جميع الحقوق محفوظة (التوصيل لكافة مدن المغرب).',
+      footerRights: '© 2026 AR Accessories Co. · جميع الحقوق محفوظة (التوصيل لكافة مدن المغرب).',
       cartTitle: 'سلة المشتريات',
       emptyCart: 'سلتك فارغة حالياً.',
       emptyCartDesc: 'اكتشف تشكيلتنا الواسعة وأضف ما يعجبك.',
@@ -275,11 +159,10 @@ function Storefront() {
       discount: 'تخفيض الكود',
       totalAmount: 'المبلغ الإجمالي',
       checkoutBtn: 'إتمام الطلب',
-      checkoutTitle: 'معلومات التوصيل والدفع',
-      checkoutDesc: 'اختر طريقة الدفع المناسبة لك (اختياري) واملأ بياناتك لتصلك الطلبية لأي مدينة.',
+      checkoutTitle: 'معلومات التوصيل',
+      checkoutDesc: 'املأ بياناتك وسنتواصل معك عبر واتساب لتأكيد الطلب وتحديد موعد التوصيل.',
       codPayment: 'الدفع عند الاستلام (COD)',
-      cmiPayment: 'بطاقة مغربية (CMI)',
-      havePromo: 'هل لديك كود تخفيض؟ (جرب: AR10)',
+      havePromo: 'هل لديك كود تخفيض؟',
       promoPlaceholder: 'أدخل الكود...',
       applyBtn: 'تطبيق',
       fullName: 'الاسم الكامل',
@@ -290,27 +173,11 @@ function Storefront() {
       address: 'العنوان التفصيلي',
       addressPlaceholder: 'الحي، الشارع ورقم العمارة أو المنزل',
       confirmOrder: 'تأكيد الطلب',
-      orderSuccessCod: 'تم تسجيل طلبك بنجاح!',
-      orderSuccessGateway: 'سيتم توجيهك لبوابة الدفع الآمنة لإتمام الأداء...',
-      cardPreview: 'معاينة البطاقة',
-      cardholderName: 'الاسم على البطاقة',
-      cardholderPlaceholder: 'الاسم كما هو مكتوب على البطاقة',
-      cardNumber: 'رقم البطاقة',
-      expiryDate: 'تاريخ الانتهاء',
-      cvv: 'CVV / CVC',
-      cvvHint: 'ثلاثة أرقام خلف البطاقة',
-      demoNotice: 'هذه معاينة للتصميم فقط: لا يتم إرسال بيانات البطاقة ولا يتم خصم أي مبلغ.',
-      processingPayment: 'جارٍ إتمام الأداء...',
-      demoSuccess: 'نجح الأداء التجريبي',
-      demoSuccessNotice: 'لم يتم تنفيذ أداء حقيقي أو خصم أي مبلغ. اربط بوابة دفع آمنة قبل الإطلاق.',
-      demoReference: 'مرجع التجربة',
-      paymentDone: 'إنهاء',
-      invalidCard: 'المرجو إدخال معلومات بطاقة صحيحة.',
-      encrypted: 'اتصال آمن',
+      orderSuccess: 'تم تسجيل طلبك بنجاح!',
     },
     en: {
       topBanner: 'Delivery to all cities in Morocco (Casablanca, Rabat, Marrakech, Beni Mellal and all cities)',
-      shippingNotice: 'Cash on Delivery (COD) or secure CMI card payment',
+      shippingNotice: 'Cash on Delivery (COD): pay when your order arrives',
       shopAll: 'Shop all',
       jewellery: 'Jewellery',
       sneakers: 'Sneakers',
@@ -329,9 +196,11 @@ function Storefront() {
       chooseTaste: 'Choose what fits your style.',
       collectionsDesc: 'A wide selection of jewellery, sneakers and smart devices.',
       quickView: 'Quick View',
-      customerReviews: 'Customer Reviews',
-      reviewsTitle: 'Trusted by customers across all cities.',
-      reviewsDesc: 'Discover experiences of our valued clients with our services.',
+      loadingProducts: 'Loading products...',
+      loadError: 'Products could not be loaded right now.',
+      loadErrorDesc: 'Check your internet connection and try again.',
+      retry: 'Try again',
+      noProducts: 'No products available right now.',
       addToCart: 'Add to Bag',
       continueShopping: 'Continue Shopping',
       close: 'Close',
@@ -339,8 +208,8 @@ function Storefront() {
       commitmentTitle: 'Fast delivery to all Moroccan cities. Total security & trust.',
       codTitle: 'Cash on Delivery (COD)',
       codDesc: 'Pay for your order in cash safely right at your doorstep.',
-      onlinePayTitle: 'Online Gateway (CMI)',
-      onlinePayDesc: 'Choose secure online payment through the CMI card gateway.',
+      whatsappTitle: 'Order confirmation on WhatsApp',
+      whatsappDesc: 'After you send your order we contact you on WhatsApp to confirm the details and delivery time.',
       nationalCoverTitle: 'Nationwide Shipping',
       nationalCoverDesc: 'We cover all cities and towns across the Kingdom of Morocco swiftly.',
       footerDesc: 'Your favorite store for accessories, jewellery and smart tech with delivery across all Moroccan cities.',
@@ -349,7 +218,7 @@ function Storefront() {
       trustAndLegal: 'Trust & Legal',
       termsOfService: 'Terms of Service',
       returnPolicy: 'Return Policy',
-      footerRights: '©️ 2026 AR Accessories Co. · All rights reserved (Delivery across Morocco).',
+      footerRights: '© 2026 AR Accessories Co. · All rights reserved (Delivery across Morocco).',
       cartTitle: 'Shopping Bag',
       emptyCart: 'Your bag is empty.',
       emptyCartDesc: 'Explore our wide collection and add what you like.',
@@ -358,11 +227,10 @@ function Storefront() {
       discount: 'Promo Discount',
       totalAmount: 'Total Amount',
       checkoutBtn: 'Proceed to Checkout',
-      checkoutTitle: 'Checkout & Payment Options',
-      checkoutDesc: 'Select your preferred payment method (optional) and enter details for nationwide delivery.',
+      checkoutTitle: 'Delivery details',
+      checkoutDesc: 'Enter your details and we will contact you on WhatsApp to confirm your order and delivery time.',
       codPayment: 'Cash on Delivery (COD)',
-      cmiPayment: 'Moroccan Card (CMI)',
-      havePromo: 'Have a promo code? (Try: AR10)',
+      havePromo: 'Have a promo code?',
       promoPlaceholder: 'Enter code...',
       applyBtn: 'Apply',
       fullName: 'Full Name',
@@ -373,27 +241,12 @@ function Storefront() {
       address: 'Detailed Address',
       addressPlaceholder: 'Neighborhood, street and building/house number',
       confirmOrder: 'Confirm Order',
-      orderSuccessCod: 'Order request received successfully!',
-      orderSuccessGateway: 'Redirecting to secure payment gateway...',
-      cardPreview: 'Card preview',
-      cardholderName: 'Cardholder name',
-      cardholderPlaceholder: 'Name as shown on the card',
-      cardNumber: 'Card number',
-      expiryDate: 'Expiry date',
-      cvv: 'CVV / CVC',
-      cvvHint: 'Three digits on the back of your card',
-      demoNotice: 'Design preview only: card details are not sent and no money is charged.',
-      processingPayment: 'Processing payment...',
-      demoSuccess: 'Payment Successful (Demo)',
-      demoSuccessNotice: 'No real payment was processed and no money was charged. Connect a secure gateway before launch.',
-      demoReference: 'Demo reference',
-      paymentDone: 'Done',
-      invalidCard: 'Please enter valid card details.',
-      encrypted: 'Secure connection',
-    }
+      orderSuccess: 'Order request received successfully!',
+    },
   }
 
   const currentText = t[lang]
+  const categoryLabel = (value: string) => (lang === 'ar' ? categoryLabels[value]?.ar : categoryLabels[value]?.en) ?? value
 
   const filteredProducts = useMemo(() => {
     let result = storeProducts.filter(product =>
@@ -409,52 +262,69 @@ function Storefront() {
 
     return result
   }, [category, search, sortBy, storeProducts])
-  
+
+  // Cart items are rebuilt from saved products, so prices cannot be tampered with in localStorage.
+  const cart: CartItem[] = useMemo(
+    () => cartLines.flatMap(line => {
+      const product = storeProducts.find(item => item.id === line.id)
+      return product ? [{ product, quantity: line.quantity }] : []
+    }),
+    [cartLines, storeProducts],
+  )
+
   const itemCount = cart.reduce((count, item) => count + item.quantity, 0)
   const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  // The discount is derived from the current subtotal, so it stays correct when the cart changes.
+  const appliedDiscount = appliedPromo === 'AR10' ? Math.round(subtotal * 0.1) : appliedPromo === 'FREESHIP' ? Math.min(50, subtotal) : 0
   const total = Math.max(0, subtotal - appliedDiscount)
-  
+
   const addToCart = (product: Product) => {
-    setCart(current => {
-      const existing = current.find(item => item.product.id === product.id)
+    setCartLines(current => {
+      const existing = current.find(line => line.id === product.id)
       return existing
-        ? current.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...current, { product, quantity: 1 }]
+        ? current.map(line => line.id === product.id ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line)
+        : [...current, { id: product.id, quantity: 1 }]
     })
     toast.success(lang === 'ar' ? 'تمت الإضافة إلى السلة' : 'Added to your bag', { description: lang === 'ar' ? product.name : product.nameEn })
   }
 
-  const updateQuantity = (id: string, change: number) => setCart(current => current.flatMap(item => {
-    if (item.product.id !== id) return [item]
-    const quantity = item.quantity + change
-    return quantity > 0 ? [{ ...item, quantity }] : []
+  const updateQuantity = (id: string, change: number) => setCartLines(current => current.flatMap(line => {
+    if (line.id !== id) return [line]
+    const quantity = Math.min(99, line.quantity + change)
+    return quantity > 0 ? [{ ...line, quantity }] : []
   }))
 
   const applyPromo = () => {
     const code = customer.promoCode.trim().toUpperCase()
     if (code === 'AR10') {
-      const discount = Math.round(subtotal * 0.1)
-      setAppliedDiscount(discount)
+      setAppliedPromo('AR10')
       toast.success(lang === 'ar' ? 'تم تطبيق كود التخفيض!' : 'Promo code applied!', { description: lang === 'ar' ? 'تخفيض 10% على طلبيتك.' : '10% discount added to your order.' })
     } else if (code === 'FREESHIP') {
-      setAppliedDiscount(50)
-      toast.success(lang === 'ar' ? 'تم تطبيق كود التخفيض!' : 'Promo code applied!', { description: lang === 'ar' ? 'تخفيض الشحن 50 درهم.' : '50 DH shipping discount added.' })
+      setAppliedPromo('FREESHIP')
+      toast.success(lang === 'ar' ? 'تم تطبيق كود التخفيض!' : 'Promo code applied!', { description: lang === 'ar' ? 'تخفيض 50 درهم على طلبيتك.' : '50 DH discount added to your order.' })
     } else {
-      toast.error(lang === 'ar' ? 'كود تخفيض غير صالح' : 'Invalid promo code', { description: lang === 'ar' ? 'جرب استخدام كود "AR10"' : 'Try using code "AR10"' })
+      setAppliedPromo(null)
+      toast.error(lang === 'ar' ? 'كود تخفيض غير صالح' : 'Invalid promo code')
     }
   }
 
-  const supportWhatsappUrl = `https://wa.me/212610967239?text=${encodeURIComponent('Hello AR Accessories Co., I need assistance with my order...')}`
+  const supportWhatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hello AR Accessories Co., I need assistance with my order...')}`
 
   const placeOrder = async () => {
+    if (busy || cart.length === 0) return
     if (!customer.name.trim() || !customer.phone.trim() || !customer.city.trim() || !customer.address.trim()) {
-      toast.error(lang === 'ar' ? 'المرجو إتمام جميع معلومات التوصيل (بما فيها المدینة).' : 'Please complete all delivery details (including city).')
+      toast.error(lang === 'ar' ? 'المرجو إتمام جميع معلومات التوصيل (بما فيها المدينة).' : 'Please complete all delivery details (including city).')
+      return
+    }
+    if (customer.phone.replace(/\D/g, '').length < 9) {
+      toast.error(lang === 'ar' ? 'المرجو إدخال رقم هاتف صحيح.' : 'Please enter a valid phone number.')
       return
     }
 
     const orderItems = cart.map(item =>
       `- ${lang === 'ar' ? item.product.name : item.product.nameEn} x ${item.quantity} = ${formatPrice(item.product.price * item.quantity)}`,
     ).join('\n')
+    const discountLine = appliedDiscount > 0 ? `\n${lang === 'ar' ? 'التخفيض' : 'Discount'}: -${formatPrice(appliedDiscount)}` : ''
     const waMessage = `${lang === 'ar' ? 'السلام عليكم، أريد تأكيد طلبي:' : 'Hello, I would like to confirm my order:'}
 
 ${lang === 'ar' ? 'الاسم الكامل' : 'Full name'}: ${customer.name.trim()}
@@ -463,36 +333,46 @@ ${lang === 'ar' ? 'المدينة' : 'City'}: ${customer.city.trim()}
 ${lang === 'ar' ? 'العنوان التفصيلي' : 'Detailed address'}: ${customer.address.trim()}
 
 ${lang === 'ar' ? 'المنتجات' : 'Products'}:
-${orderItems}
+${orderItems}${discountLine}
 
-${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(total)}`
-    const whatsappUrl = `https://wa.me/212610967239?text=${encodeURIComponent(waMessage)}`
-    const whatsappWindow = window.open(whatsappUrl, '_blank')
-    if (!whatsappWindow) window.location.href = whatsappUrl
+${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(total)}
+${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Payment: Cash on Delivery (COD)'}`
+    const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMessage)}`
+
+    // Reserve the new tab right now (inside the click) so the browser does not block it after the async save below.
+    const whatsappWindow = window.open('', '_blank')
 
     setBusy(true)
     try {
-      const orderTable = blink.db.table<OrdersRow>('orders')
-      await orderTable.create({
-        userId: 'guest', 
-        customerName: customer.name.trim(), 
-        phone: customer.phone.trim(), 
-        address: `${customer.city.trim()} - ${customer.address.trim()}`,
-        itemsJson: JSON.stringify(cart.map(item => ({ id: item.product.id, name: item.product.name, quantity: item.quantity, price: item.product.price }))),
-        totalAmount: total, 
-        status: 'pending',
-      })
-    } catch (error) {
-      console.error('Failed to save guest order; WhatsApp order was opened.', error)
-    } finally {
-      toast.success(currentText.orderSuccessCod, { description: lang === 'ar' ? 'نحن نشحن بكل أمان لجميع مدن المغرب.' : 'We ship securely to all cities across Morocco.' })
-      setCart([])
+      // 1) Save the order locally before handing off to WhatsApp.
+      try {
+        const savedOrders = JSON.parse(localStorage.getItem('ar-orders') || '[]') as unknown
+        if (!Array.isArray(savedOrders)) throw new Error('Saved orders are not in a valid format.')
+        localStorage.setItem('ar-orders', JSON.stringify([...savedOrders, {
+          id: crypto.randomUUID(),
+          customerName: customer.name.trim(),
+          phone: customer.phone.trim(),
+          address: `${customer.city.trim()} - ${customer.address.trim()}`,
+          itemsJson: JSON.stringify(cart.map(item => ({ id: item.product.id, name: item.product.name, quantity: item.quantity, price: item.product.price }))),
+          totalAmount: total,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        }]))
+      } catch (error) {
+        console.error('Failed to save the order; the WhatsApp order will still be sent.', error)
+      }
+
+      // 2) Then open WhatsApp.
+      if (whatsappWindow) whatsappWindow.location.href = whatsappUrl
+      else window.location.href = whatsappUrl
+
+      toast.success(currentText.orderSuccess, { description: lang === 'ar' ? 'نحن نشحن بكل أمان لجميع مدن المغرب.' : 'We ship securely to all cities across Morocco.' })
+      setCartLines([])
       setCartOpen(false)
       setCheckoutOpen(false)
       setCustomer({ name: '', phone: '', city: '', address: '', promoCode: '' })
-      setAppliedDiscount(0)
-      setCard({ cardholder: '', number: '', expiry: '', cvv: '' })
-      setGatewayStep('details')
+      setAppliedPromo(null)
+    } finally {
       setBusy(false)
     }
   }
@@ -506,10 +386,10 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
   return (
     <div dir={lang === 'ar' ? 'rtl' : 'ltr'} className="min-h-dvh bg-background text-foreground selection:bg-primary/20 font-sans">
       {/* Floating Support WhatsApp Button */}
-      <a 
-        href={supportWhatsappUrl} 
-        target="_blank" 
-        rel="noreferrer" 
+      <a
+        href={supportWhatsappUrl}
+        target="_blank"
+        rel="noreferrer"
         aria-label="Contact Customer Support via WhatsApp"
         className={`fixed bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xl transition-transform duration-300 hover:scale-110 active:scale-95 ${lang === 'ar' ? 'left-6' : 'right-6'}`}
       >
@@ -529,15 +409,15 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
         <div className="mx-auto flex items-center gap-2">
           <Truck size={14} className="text-primary"/> {currentText.shippingNotice}
         </div>
-        <button 
-          onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')} 
+        <button
+          onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
           className="flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-[11px] font-bold text-foreground transition hover:border-primary active:scale-95 shadow-sm"
         >
           <Globe size={13} className="text-primary"/>
           <span>{lang === 'ar' ? 'English' : 'العربية'}</span>
         </button>
       </div>
-      
+
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex h-19 max-w-7xl items-center gap-5 px-4 sm:px-8">
           <a href="#home" className="flex shrink-0 items-center gap-3 transition-transform duration-200 active:scale-95" aria-label="AR Accessories Co. home">
@@ -550,7 +430,7 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
             <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}>{currentText.sneakers}</a>
             <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Audio')}>{currentText.audio}</a>
           </nav>
-          <label className={`mx-auto hidden h-10 max-w-sm flex-1 items-center gap-2.5 rounded-full border border-border bg-secondary/60 px-4 md:flex transition-all focus-within:border-primary`}>
+          <label className="mx-auto hidden h-10 max-w-sm flex-1 items-center gap-2.5 rounded-full border border-border bg-secondary/60 px-4 md:flex transition-all focus-within:border-primary">
             <Search size={16} className="shrink-0 text-muted-foreground"/>
             <input aria-label="Search products" value={search} onChange={event => setSearch(event.target.value)} placeholder={currentText.searchPlaceholder} className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"/>
           </label>
@@ -605,13 +485,13 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
             <div className="flex flex-wrap gap-2" role="group" aria-label="Filter products by category">
               {categories.map(item => (
                 <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)} className={`rounded-full border px-4 py-2 text-[11px] font-semibold transition-all duration-200 active:scale-95 ${category === item ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-card hover:border-primary hover:text-primary'}`}>
-                  {lang === 'ar' ? categoryLabels[item]?.ar ?? item : categoryLabels[item]?.en ?? item}
+                  {categoryLabel(item)}
                 </button>
               ))}
             </div>
 
             <div className="relative shrink-0 self-start lg:self-auto">
-              <button 
+              <button
                 onClick={() => setSortOpen(!sortOpen)}
                 className="flex items-center gap-2.5 rounded-full border border-border bg-card px-4 py-2 text-[11px] font-semibold transition-all hover:border-primary active:scale-95 text-foreground shadow-sm"
               >
@@ -644,63 +524,61 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
             <input aria-label="Search products" value={search} onChange={event => setSearch(event.target.value)} placeholder={currentText.searchPlaceholder} className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"/>
           </label>
 
-          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-            {filteredProducts.map((product, index) => (
-              <article key={product.id} className="group overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-                <div 
-                  onClick={() => setSelectedProduct(product)} 
-                  className="relative aspect-[0.91] overflow-hidden bg-secondary cursor-pointer"
-                  title="Click to view product details"
-                >
-                  <img src={product.image} alt={lang === 'ar' ? product.name : product.nameEn} loading={index > 3 ? 'lazy' : 'eager'} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]"/>
-                  {(product.tag || product.tagEn) && <span className={`absolute top-3 rounded-full bg-background/90 px-2.5 py-1 text-[8px] font-bold tracking-[0.12em] text-foreground backdrop-blur ${lang === 'ar' ? 'left-3' : 'right-3'}`}>{lang === 'ar' ? product.tag : product.tagEn}</span>}
-                  
-                  <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center">
-                    <span className="flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-[10px] font-bold text-foreground shadow-md backdrop-blur-md transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <Eye size={13} className="text-primary"/> {currentText.quickView}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3.5 sm:p-4">
-                  <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{product.category}</p>
-                  <h3 onClick={() => setSelectedProduct(product)} className="min-h-10 text-sm font-semibold leading-5 cursor-pointer hover:text-primary transition-colors">{lang === 'ar' ? product.name : product.nameEn}</h3>
-                  <div className="mt-3 flex items-center justify-between gap-1">
-                    <span className="text-sm font-bold">{formatPrice(product.price)}</span>
-                    <button onClick={() => addToCart(product)} aria-label={`Add product to cart`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-transform duration-200 hover:scale-110 active:scale-90 shadow-sm"><Plus size={17}/></button>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{lang === 'ar' ? product.description : product.descriptionEn}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-          {filteredProducts.length === 0 && <div className="mt-6 rounded-xl border border-dashed border-border py-14 text-center"><p className="font-serif text-2xl">{lang === 'ar' ? 'لا توجد نتائج مطابقة.' : 'No matching results.'}</p><p className="mt-2 text-sm text-muted-foreground">{lang === 'ar' ? 'جرب البحث بكلمة أخرى أو تصفح قسم مختلف.' : 'Try searching with another keyword or category.'}</p></div>}
-        </div>
-      </section>
+          {loadStatus === 'loading' && (
+            <p className="mt-10 text-center text-sm text-muted-foreground">{currentText.loadingProducts}</p>
+          )}
 
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-8 sm:py-16">
-        <div className="text-center max-w-xl mx-auto mb-10">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{currentText.customerReviews}</p>
-          <h2 className="font-serif text-3xl tracking-tight sm:text-4xl">{currentText.reviewsTitle}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{currentText.reviewsDesc}</p>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-3">
-          {reviews.map(review => (
-            <div key={review.id} className="relative rounded-2xl border border-border/80 bg-card p-6 shadow-sm flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-              <div>
-                <div className="flex items-center gap-1 text-amber-500 mb-3">
-                  {[...Array(review.rating)].map((_, i) => (
-                    <Star key={i} size={14} className="fill-amber-500"/>
-                  ))}
-                </div>
-                <Quote size={24} className="text-primary/20 mb-2"/>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed italic mb-6">"{lang === 'ar' ? review.comment : review.commentEn}"</p>
-              </div>
-              <div className="border-t border-border/60 pt-4 flex items-center justify-between">
-                <span className="text-xs font-bold">{lang === 'ar' ? review.name : review.nameEn}</span>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded-full">{lang === 'ar' ? review.city : review.cityEn}</span>
-              </div>
+          {loadStatus === 'error' && (
+            <div className="mt-6 rounded-xl border border-dashed border-border py-14 text-center">
+              <p className="font-serif text-2xl">{currentText.loadError}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{currentText.loadErrorDesc}</p>
+              <button
+                onClick={() => { setLoadStatus('loading'); setReloadKey(key => key + 1) }}
+                className="mt-5 rounded-full bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95"
+              >
+                {currentText.retry}
+              </button>
             </div>
-          ))}
+          )}
+
+          {loadStatus === 'ready' && (
+            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+              {filteredProducts.map((product, index) => (
+                <article key={product.id} className="group overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+                  <div
+                    onClick={() => setSelectedProduct(product)}
+                    className="relative aspect-[0.91] overflow-hidden bg-secondary cursor-pointer"
+                    title="Click to view product details"
+                  >
+                    <img src={product.image} alt={lang === 'ar' ? product.name : product.nameEn} loading={index > 3 ? 'lazy' : 'eager'} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]"/>
+                    {(product.tag || product.tagEn) && <span className={`absolute top-3 rounded-full bg-background/90 px-2.5 py-1 text-[8px] font-bold tracking-[0.12em] text-foreground backdrop-blur ${lang === 'ar' ? 'left-3' : 'right-3'}`}>{lang === 'ar' ? product.tag : product.tagEn}</span>}
+
+                    <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center">
+                      <span className="flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-[10px] font-bold text-foreground shadow-md backdrop-blur-md transform translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+                        <Eye size={13} className="text-primary"/> {currentText.quickView}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3.5 sm:p-4">
+                    <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{categoryLabel(product.category)}</p>
+                    <h3 onClick={() => setSelectedProduct(product)} className="min-h-10 text-sm font-semibold leading-5 cursor-pointer hover:text-primary transition-colors">{lang === 'ar' ? product.name : product.nameEn}</h3>
+                    <div className="mt-3 flex items-center justify-between gap-1">
+                      <span className="text-sm font-bold">{formatPrice(product.price)}</span>
+                      <button onClick={() => addToCart(product)} aria-label="Add product to cart" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-transform duration-200 hover:scale-110 active:scale-90 shadow-sm"><Plus size={17}/></button>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{lang === 'ar' ? product.description : product.descriptionEn}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {loadStatus === 'ready' && filteredProducts.length === 0 && (
+            <div className="mt-6 rounded-xl border border-dashed border-border py-14 text-center">
+              <p className="font-serif text-2xl">{storeProducts.length === 0 ? currentText.noProducts : (lang === 'ar' ? 'لا توجد نتائج مطابقة.' : 'No matching results.')}</p>
+              {storeProducts.length > 0 && <p className="mt-2 text-sm text-muted-foreground">{lang === 'ar' ? 'جرب البحث بكلمة أخرى أو تصفح قسم مختلف.' : 'Try searching with another keyword or category.'}</p>}
+            </div>
+          )}
         </div>
       </section>
 
@@ -714,7 +592,7 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
             </div>
             <div className="p-6 flex flex-col justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-1">{selectedProduct.category}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-1">{categoryLabel(selectedProduct.category)}</p>
                 <h3 className="font-serif text-2xl sm:text-3xl leading-tight mb-3">{lang === 'ar' ? selectedProduct.name : selectedProduct.nameEn}</h3>
                 <p className="text-xl font-bold mb-4 text-primary">{formatPrice(selectedProduct.price)}</p>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6">{lang === 'ar' ? selectedProduct.description : selectedProduct.descriptionEn}</p>
@@ -758,7 +636,7 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
           <h2 className="font-serif text-3xl leading-tight sm:text-4xl">{currentText.commitmentTitle}</h2>
         </div>
         <div className="grid gap-5 sm:grid-cols-3">
-          {[{ icon: Banknote, title: currentText.codTitle, body: currentText.codDesc }, { icon: CreditCard, title: currentText.onlinePayTitle, body: currentText.onlinePayDesc }, { icon: Truck, title: currentText.nationalCoverTitle, body: currentText.nationalCoverDesc }].map(item => (
+          {[{ icon: Banknote, title: currentText.codTitle, body: currentText.codDesc }, { icon: MessageCircle, title: currentText.whatsappTitle, body: currentText.whatsappDesc }, { icon: Truck, title: currentText.nationalCoverTitle, body: currentText.nationalCoverDesc }].map(item => (
             <div key={item.title} className="border-t border-border pt-4">
               <item.icon size={19} className="mb-3 text-primary"/>
               <h3 className="text-xs font-semibold">{item.title}</h3>
@@ -857,61 +735,29 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
 
       {checkoutOpen && (
         <div className="fixed inset-0 z-60 grid place-items-center bg-primary/45 p-4 backdrop-blur-sm" onClick={() => setCheckoutOpen(false)}>
-          <section role="dialog" aria-modal="true" onClick={event => event.stopPropagation()} className="checkout-scrollbar-hidden max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-background p-5 shadow-xl sm:p-7">
+          <section role="dialog" aria-modal="true" onClick={event => event.stopPropagation()} className="checkout-scrollbar-hidden max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-3xl bg-background p-5 shadow-xl sm:p-7">
             <div className="mb-5 flex items-start justify-between">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary">Secure Checkout & Gateways</p>
+                <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-primary">Secure Checkout</p>
                 <h2 className="mt-1 font-serif text-3xl">{currentText.checkoutTitle}</h2>
                 <p className="mt-1 text-xs text-muted-foreground">{currentText.checkoutDesc}</p>
               </div>
-              <button aria-label="Close checkout" onClick={() => { setCheckoutOpen(false); setGatewayStep('details') }} className="rounded-full p-2 hover:bg-muted active:scale-90 transition-transform"><X size={17}/></button>
+              <button aria-label="Close checkout" onClick={() => setCheckoutOpen(false)} className="rounded-full p-2 hover:bg-muted active:scale-90 transition-transform"><X size={17}/></button>
             </div>
 
             <style>{`
               .checkout-scrollbar-hidden { scrollbar-width: none; -ms-overflow-style: none; }
               .checkout-scrollbar-hidden::-webkit-scrollbar { display: none; }
-              @keyframes payment-stage-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-              @keyframes payment-check-pop { 0% { opacity: 0; transform: scale(.45) rotate(-18deg); } 70% { opacity: 1; transform: scale(1.12) rotate(4deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
-              .payment-stage-enter { animation: payment-stage-in 320ms cubic-bezier(.23,1,.32,1) both; }
-              .payment-check-pop { animation: payment-check-pop 520ms cubic-bezier(.23,1,.32,1) both; }
-              @media (prefers-reduced-motion: reduce) { .payment-stage-enter, .payment-check-pop { animation-duration: 1ms; } }
             `}</style>
 
-            {gatewayStep === 'processing' ? (
-              <div className="payment-stage-enter flex min-h-105 flex-col items-center justify-center rounded-2xl border border-border bg-secondary/30 p-6 text-center sm:p-8" aria-live="polite">
-                <div className="w-full max-w-sm rounded-2xl bg-linear-to-br from-slate-900 via-blue-950 to-indigo-900 p-5 text-left text-white shadow-2xl transition-transform duration-500">
-                  <div className="flex items-start justify-between"><span className="grid h-8 w-10 place-items-center rounded-md bg-linear-to-br from-amber-200 to-yellow-500 text-[8px] font-bold text-yellow-950">CARD</span><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">{card.number.startsWith('4') ? 'VISA' : card.number.startsWith('5') ? 'MASTERCARD' : paymentMethod.toUpperCase()}</span></div>
-                  <p className="mt-7 break-all font-mono text-base tracking-[0.14em] sm:text-lg">{card.number ? card.number.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}</p>
-                  <div className="mt-5 flex justify-between gap-3 text-[9px] uppercase tracking-wider text-white/75"><span className="min-w-0 truncate">{card.cardholder || currentText.cardholderName}</span><span>{card.expiry || 'MM/YY'}</span></div>
+            <div className="space-y-4">
+              {/* Payment: Cash on Delivery only */}
+              <div className="flex items-center gap-3 rounded-xl border border-primary bg-primary/10 p-3 text-primary">
+                <Banknote size={18} className="shrink-0"/>
+                <div>
+                  <p className="text-xs font-semibold">{currentText.codPayment}</p>
+                  <p className="mt-0.5 text-[11px] text-primary/80">{currentText.codDesc}</p>
                 </div>
-                <div className="mt-7 flex items-center gap-3"><span className="h-6 w-6 rounded-full border-[3px] border-primary/20 border-t-primary animate-spin"/><h3 className="font-serif text-2xl">{currentText.processingPayment}</h3></div>
-                <p className="mt-2 max-w-sm text-xs text-muted-foreground">{currentText.demoNotice}</p>
-              </div>
-            ) : gatewayStep === 'success' ? (
-              <div className="payment-stage-enter flex min-h-105 flex-col items-center justify-center rounded-2xl border border-border bg-secondary/30 p-6 text-center" aria-live="polite">
-                <h3 className="font-serif text-3xl">{currentText.demoSuccess}</h3>
-                <p className="mt-2 max-w-md text-sm text-muted-foreground">{currentText.demoSuccessNotice}</p>
-                <div className="relative mt-6 w-full max-w-sm overflow-hidden rounded-2xl bg-linear-to-br from-slate-900 via-blue-950 to-indigo-900 p-5 text-left text-white shadow-2xl sm:p-6">
-                  <div className="flex items-start justify-between"><span className="grid h-8 w-10 place-items-center rounded-md bg-linear-to-br from-amber-200 to-yellow-500 text-[8px] font-bold text-yellow-950">CARD</span><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">{paymentMethod.toUpperCase()}</span></div>
-                  <p className="mt-7 break-all font-mono text-base tracking-[0.14em] sm:text-lg">•••• •••• •••• {card.number.replace(/\D/g, '').slice(-4) || '••••'}</p>
-                  <div className="mt-5 flex justify-between gap-4 text-[9px] uppercase tracking-wider text-white/75"><span className="truncate">{card.cardholder || 'CARDHOLDER'}</span><span>{card.expiry || 'MM/YY'}</span></div>
-                  <div className="absolute inset-0 grid place-items-center bg-slate-950/35"><div className="payment-check-pop grid h-20 w-20 place-items-center rounded-full border-4 border-white bg-emerald-500 text-white shadow-2xl sm:h-24 sm:w-24"><Check size={52} strokeWidth={3.5}/></div></div>
-                </div>
-                <div className="mt-4 flex w-full max-w-sm justify-between rounded-xl border border-border bg-background px-4 py-3 text-xs"><span>{currentText.demoReference}</span><b>{orderReference}</b></div>
-                <div className="mt-3 flex w-full max-w-sm justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold"><span>{currentText.totalAmount}</span><span>{formatPrice(total)}</span></div>
-                <button onClick={() => { setCart([]); setCartOpen(false); setCheckoutOpen(false); setCustomer({ name: '', phone: '', city: '', address: '', promoCode: '' }); setCard({ cardholder: '', number: '', expiry: '', cvv: '' }); setAppliedDiscount(0); setGatewayStep('details') }} className="mt-6 h-12 w-full max-w-sm rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95">{currentText.paymentDone}</button>
-              </div>
-            ) : (
-            <>
-            <div className="payment-stage-enter space-y-4">
-              {/* Available payment methods: Cash on Delivery or CMI */}
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => { setPaymentMethod('cod'); setGatewayStep('details') }} className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-[11px] font-semibold transition-all duration-200 active:scale-95 ${paymentMethod === 'cod' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border'}`}>
-                  <Banknote size={17}/> <span>COD</span>
-                </button>
-                <button type="button" onClick={() => { setPaymentMethod('cmi'); setGatewayStep('details') }} className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-[11px] font-semibold transition-all duration-200 active:scale-95 ${paymentMethod === 'cmi' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border'}`}>
-                  <CreditCard size={17}/> <span>CMI Maroc</span>
-                </button>
               </div>
 
               <div className="rounded-xl border border-border bg-secondary/40 p-3.5 space-y-2">
@@ -929,7 +775,7 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-semibold">{currentText.phone}</span>
-                  <input value={customer.phone} onChange={event => setCustomer(current => ({ ...current, phone: event.target.value }))} placeholder="+212 6XX XXX XXX" className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"/>
+                  <input type="tel" inputMode="tel" value={customer.phone} onChange={event => setCustomer(current => ({ ...current, phone: event.target.value }))} placeholder="+212 6XX XXX XXX" className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"/>
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-semibold">{currentText.city}</span>
@@ -940,38 +786,6 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
                   <input value={customer.address} onChange={event => setCustomer(current => ({ ...current, address: event.target.value }))} placeholder={currentText.addressPlaceholder} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"/>
                 </label>
               </div>
-
-              {paymentMethod !== 'cod' && (
-                <div className="grid gap-5 rounded-2xl border border-border bg-secondary/20 p-4 sm:grid-cols-[0.9fr_1.1fr] sm:p-5">
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold">{currentText.cardPreview}</p>
-                    <div className="perspective-[1000px]">
-                      <div className="relative h-48 w-full transition-transform duration-500" style={{ transformStyle: 'preserve-3d', transform: cardIsFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
-                        <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-slate-900 via-blue-950 to-indigo-900 p-5 text-white shadow-xl" style={{ backfaceVisibility: 'hidden' }}>
-                          <div className="flex items-start justify-between"><span className="grid h-8 w-10 place-items-center rounded-md bg-linear-to-br from-amber-200 to-yellow-500 text-[8px] font-bold text-yellow-950">CARD</span><span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">{card.number.startsWith('4') ? 'VISA' : card.number.startsWith('5') ? 'MASTERCARD' : 'CARD'}</span></div>
-                          <p className="mt-7 break-all font-mono text-base tracking-[0.14em] sm:text-lg">{card.number ? card.number.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}</p>
-                          <div className="mt-5 flex justify-between gap-3 text-[9px] uppercase tracking-wider text-white/75"><span className="min-w-0 truncate">{card.cardholder || currentText.cardholderName}</span><span className="shrink-0">{card.expiry || 'MM/YY'}</span></div>
-                        </div>
-                        <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-slate-900 via-blue-950 to-indigo-900 p-5 text-white shadow-xl" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                          <div className="-mx-5 mt-4 h-10 bg-black/75"/>
-                          <div className="mt-5 flex h-9 items-center justify-end rounded bg-white px-3 font-mono tracking-[0.25em] text-slate-900">•••</div>
-                          <p className="mt-3 text-right text-[9px] uppercase tracking-wider text-white/75">{currentText.cvvHint}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="flex items-center gap-1.5 text-[10px] text-emerald-700"><ShieldCheck size={13}/>{currentText.encrypted}</p>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="block"><span className="mb-1 block text-[11px] font-semibold">{currentText.cardholderName}</span><input autoComplete="cc-name" value={card.cardholder} onChange={event => setCard(current => ({ ...current, cardholder: event.target.value.toUpperCase() }))} placeholder={currentText.cardholderPlaceholder} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"/></label>
-                    <label className="block"><span className="mb-1 block text-[11px] font-semibold">{currentText.cardNumber}</span><input inputMode="numeric" autoComplete="cc-number" maxLength={23} value={card.number.replace(/(.{4})/g, '$1 ').trim()} onChange={event => setCard(current => ({ ...current, number: event.target.value.replace(/\D/g, '').slice(0, 19) }))} placeholder="1234 5678 9012 3456" className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-xs tracking-wider outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"/></label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="block"><span className="mb-1 block text-[11px] font-semibold">{currentText.expiryDate}</span><input inputMode="numeric" autoComplete="cc-exp" maxLength={5} value={card.expiry} onChange={event => { const digits = event.target.value.replace(/\D/g, '').slice(0, 4); setCard(current => ({ ...current, expiry: digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits })) }} placeholder="MM/YY" className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"/></label>
-                      <label className="block"><span className="mb-1 block text-[11px] font-semibold">{currentText.cvv}</span><input inputMode="numeric" autoComplete="cc-csc" maxLength={4} value={card.cvv} onFocus={() => { setCardIsFlipped(true); triggerPaymentFeedback('flip') }} onBlur={() => setCardIsFlipped(false)} onChange={event => setCard(current => ({ ...current, cvv: event.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="•••" className="h-10 w-full rounded-lg border border-input bg-background px-3 font-mono text-xs tracking-widest outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"/></label>
-                    </div>
-                    <p className="rounded-lg border border-amber-300/60 bg-amber-50 p-2.5 text-[10px] leading-4 text-amber-900">{currentText.demoNotice}</p>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="my-5 rounded-xl bg-secondary p-4 space-y-1.5">
@@ -983,8 +797,6 @@ ${lang === 'ar' ? 'المبلغ الإجمالي' : 'Total'}: ${formatPrice(tota
             <button disabled={busy} onClick={placeOrder} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-65">
               {currentText.confirmOrder} <ArrowRight size={15}/>
             </button>
-            </>
-            )}
           </section>
         </div>
       )}
