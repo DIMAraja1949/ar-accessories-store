@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme inline {
+  --color-orange: #F97316;
+  --color-orange-dark: #EA580C;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -38,18 +40,18 @@
   --card-foreground: #262626;
   --popover: #ffffff;
   --popover-foreground: #262626;
-  --primary: #c95002;
+  --primary: #F97316;
   --primary-foreground: #ffffff;
   --secondary: #f5eee8;
   --secondary-foreground: #382a22;
   --muted: #f2ede8;
   --muted-foreground: #746b65;
-  --accent: #f7e6d9;
-  --accent-foreground: #6e2b08;
+  --accent: #ffedd5;
+  --accent-foreground: #7c2d12;
   --destructive: #b42318;
   --border: #e5ded8;
   --input: #e5ded8;
-  --ring: #c95002;
+  --ring: #EA580C;
   --radius: 0.5rem;
 }
 
@@ -61,18 +63,18 @@
   --card-foreground: #f5f1ed;
   --popover: #26221f;
   --popover-foreground: #f5f1ed;
-  --primary: #f07832;
-  --primary-foreground: #21150e;
+  --primary: #EA580C;
+  --primary-foreground: #ffffff;
   --secondary: #332c27;
   --secondary-foreground: #f5f1ed;
   --muted: #332c27;
   --muted-foreground: #b9aaa0;
   --accent: #493023;
-  --accent-foreground: #ffd9c0;
+  --accent-foreground: #fed7aa;
   --destructive: #f87171;
   --border: #473d36;
   --input: #473d36;
-  --ring: #f07832;
+  --ring: #F97316;
 }
 
 * {

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { ClientOnly } from '@tanstack/react-router'
-import { ArrowRight, Banknote, Headphones, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe } from 'lucide-react'
+import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { loadStoredProducts } from '@/lib/products-storage'
 
@@ -56,7 +56,8 @@ function Storefront() {
   const [cartOpen, setCartOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [modalPage, setModalPage] = useState<'none' | 'terms' | 'returns'>('none')
+  const [modalPage, setModalPage] = useState<'none' | 'privacy' | 'terms' | 'returns'>('none')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const [customer, setCustomer] = useState({ name: '', phone: '', city: '', address: '', promoCode: '' })
@@ -148,8 +149,9 @@ function Storefront() {
       quickLinks: 'روابط سريعة',
       categoriesFooter: 'الأقسام',
       trustAndLegal: 'الثقة والقانون',
-      termsOfService: 'شروط الخدمة',
-      returnPolicy: 'سياسة الاسترجاع',
+      privacyPolicy: 'سياسة الخصوصية',
+      termsOfService: 'الشروط والأحكام',
+      returnPolicy: 'سياسة الشحن والاسترجاع',
       footerRights: '© 2026 AR Accessories Co. · جميع الحقوق محفوظة (التوصيل لكافة مدن المغرب).',
       cartTitle: 'سلة المشتريات',
       emptyCart: 'سلتك فارغة حالياً.',
@@ -216,8 +218,9 @@ function Storefront() {
       quickLinks: 'Quick Links',
       categoriesFooter: 'Categories',
       trustAndLegal: 'Trust & Legal',
-      termsOfService: 'Terms of Service',
-      returnPolicy: 'Return Policy',
+      privacyPolicy: 'Privacy Policy',
+      termsOfService: 'Terms & Conditions',
+      returnPolicy: 'Shipping & Returns',
       footerRights: '© 2026 AR Accessories Co. · All rights reserved (Delivery across Morocco).',
       cartTitle: 'Shopping Bag',
       emptyCart: 'Your bag is empty.',
@@ -391,15 +394,15 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         target="_blank"
         rel="noreferrer"
         aria-label="Contact Customer Support via WhatsApp"
-        className={`fixed bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-2xl transition-transform duration-300 hover:scale-110 active:scale-95 ${lang === 'ar' ? 'left-6' : 'right-6'}`}
+        className={`fixed bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#EA580C] text-white shadow-2xl ring-2 ring-[#F97316]/70 ring-offset-2 ring-offset-background transition-all duration-300 hover:scale-110 hover:ring-[#EA580C] active:scale-95 ${lang === 'ar' ? 'left-6' : 'right-6'}`}
       >
         <MessageCircle size={28}/>
       </a>
 
-      <div className="relative bg-linear-to-r from-zinc-900 via-primary to-zinc-900 px-4 py-2.5 text-center text-xs font-medium text-white shadow-inner">
+      <div className="relative bg-linear-to-r from-zinc-900 via-[#EA580C] to-zinc-900 px-4 py-2.5 text-center text-xs font-medium text-white shadow-inner">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 flex-wrap">
           <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-            <Sparkles size={12} className="text-amber-300"/> Maroc Delivery
+            <Sparkles size={12} className="text-orange-200"/> Maroc Delivery
           </span>
           <span>{currentText.topBanner}</span>
         </div>
@@ -420,9 +423,21 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
 
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur-md">
         <div className="mx-auto flex h-19 max-w-7xl items-center gap-5 px-4 sm:px-8">
-          <a href="#home" className="flex shrink-0 items-center gap-3 transition-transform duration-200 active:scale-95" aria-label="AR Accessories Co. home">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary font-serif text-lg font-bold text-primary-foreground shadow-sm">AR</span>
-            <span className="leading-tight"><b className="block text-[13px] tracking-[0.11em]">AR ACCESSORIES CO.</b><small className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground">Maroc Store</small></span>
+          <button
+            type="button"
+            aria-label={lang === 'ar' ? 'فتح القائمة' : 'Open navigation menu'}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen(true)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border text-foreground transition hover:border-primary hover:text-primary active:scale-95 lg:hidden"
+          >
+            <Menu size={20} />
+          </button>
+          <a href="#home" className="flex shrink-0 items-center gap-2 transition-transform duration-200 active:scale-95" aria-label="AR Accessories Co. home">
+            <img src="/icon.png" alt="" className="h-10 w-auto object-contain drop-shadow-[0_0_8px_rgba(249,115,22,0.45)] sm:h-12" />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-2xl font-black uppercase leading-none tracking-wider text-foreground dark:text-white sm:text-3xl">AR</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground dark:text-gray-300 sm:text-xs">ACCESSORIES CO</span>
+            </span>
           </a>
           <nav className={`hidden items-center gap-7 text-xs font-medium text-muted-foreground lg:flex ${lang === 'ar' ? 'mr-5' : 'ml-5'}`}>
             <a className="transition hover:text-foreground active:scale-95" href="#collection">{currentText.shopAll}</a>
@@ -444,13 +459,63 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         </div>
       </header>
 
+      <div
+        className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${mobileMenuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        aria-hidden="true"
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      <aside
+        id="mobile-navigation-drawer"
+        aria-label={lang === 'ar' ? 'قائمة التنقل' : 'Mobile navigation'}
+        aria-hidden={!mobileMenuOpen}
+        inert={!mobileMenuOpen}
+        dir={lang === 'ar' ? 'rtl' : 'ltr'}
+        className={`fixed inset-y-0 left-0 z-[60] flex w-[min(84vw,22rem)] flex-col bg-background text-foreground shadow-2xl transition-transform duration-300 ease-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex min-h-20 items-center justify-between gap-3 border-b border-[#EA580C]/30 bg-[#F97316] px-5 text-white">
+          <h2 className="text-sm font-bold tracking-[0.08em]">
+            {lang === 'ar' ? 'قائمة التنقل' : 'MENU DE NAVIGATION'}
+          </h2>
+          <button
+            type="button"
+            aria-label={lang === 'ar' ? 'إغلاق القائمة' : 'Close navigation menu'}
+            onClick={() => setMobileMenuOpen(false)}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full transition hover:bg-white/20 active:scale-90"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <nav className="grid gap-1 p-4">
+          <a href="#home" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <Home size={18} className="text-primary" />
+            {lang === 'ar' ? 'الرئيسية (Accueil)' : 'Home (Accueil)'}
+          </a>
+          <a href={supportWhatsappUrl} target="_blank" rel="noreferrer" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <MessageCircle size={18} className="text-primary" />
+            {lang === 'ar' ? 'اتصل بنا' : 'Contact Us'}
+          </a>
+          <a href="#promise" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <Info size={18} className="text-primary" />
+            {lang === 'ar' ? 'من نحن' : 'About Us'}
+          </a>
+          <button type="button" onClick={() => { setMobileMenuOpen(false); setModalPage('privacy') }} className="flex items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <ShieldCheck size={18} className="text-primary" />
+            {lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}
+          </button>
+          <a href="#collection" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <BookOpen size={18} className="text-primary" />
+            {lang === 'ar' ? 'المدونة والأقسام' : 'Blog / Categories'}
+          </a>
+        </nav>
+      </aside>
+
       <section id="home" className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 pt-6 sm:px-8 sm:pb-16 sm:pt-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center lg:gap-14 lg:py-14">
         <div className="order-2 py-3 lg:order-1 lg:py-10">
           <p className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-primary"><span className="h-px w-7 bg-primary"/>{currentText.welcome}</p>
-          <h1 className="max-w-xl font-serif text-[clamp(2.8rem,6vw,5.4rem)] leading-[0.98] tracking-tighter">{currentText.heroTitle1}<br/><span className="italic text-primary">{currentText.heroTitle2}</span></h1>
+          <h1 className="max-w-xl font-serif text-[clamp(2.8rem,6vw,5.4rem)] leading-[0.98] tracking-tighter">{currentText.heroTitle1}<br/><span className="italic text-foreground">{currentText.heroTitle2}</span></h1>
           <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">{currentText.heroDesc}</p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            <a href="#collection" className="inline-flex h-12 items-center gap-3 rounded-full bg-primary px-6 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95">{currentText.shopNow} <ArrowRight size={15}/></a>
+            <a href="#collection" className="inline-flex h-12 items-center gap-3 rounded-full bg-linear-to-r from-orange-500 to-amber-600 px-6 text-xs font-bold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 active:scale-95">{currentText.shopNow} <ArrowRight size={15}/></a>
             <a href="#promise" className="rounded-full px-4 py-3 text-xs font-semibold text-muted-foreground transition-all duration-200 hover:text-foreground active:scale-95">{currentText.deliveryServices}</a>
           </div>
           <div className="mt-9 flex items-center gap-5 border-t border-border pt-5 text-[10px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
@@ -534,7 +599,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
               <p className="mt-2 text-sm text-muted-foreground">{currentText.loadErrorDesc}</p>
               <button
                 onClick={() => { setLoadStatus('loading'); setReloadKey(key => key + 1) }}
-                className="mt-5 rounded-full bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95"
+                className="mt-5 rounded-full bg-linear-to-r from-orange-500 to-amber-600 px-5 py-3 text-xs font-bold text-white shadow-md transition hover:brightness-105 active:scale-95"
               >
                 {currentText.retry}
               </button>
@@ -564,7 +629,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                     <h3 onClick={() => setSelectedProduct(product)} className="min-h-10 text-sm font-semibold leading-5 cursor-pointer hover:text-primary transition-colors">{lang === 'ar' ? product.name : product.nameEn}</h3>
                     <div className="mt-3 flex items-center justify-between gap-1">
                       <span className="text-sm font-bold">{formatPrice(product.price)}</span>
-                      <button onClick={() => addToCart(product)} aria-label="Add product to cart" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-transform duration-200 hover:scale-110 active:scale-90 shadow-sm"><Plus size={17}/></button>
+                      <button onClick={() => addToCart(product)} aria-label="Add product to cart" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-white font-bold shadow-md transition-transform duration-200 hover:scale-110 hover:brightness-105 active:scale-90"><Plus size={17}/></button>
                     </div>
                     <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{lang === 'ar' ? product.description : product.descriptionEn}</p>
                   </div>
@@ -598,7 +663,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6">{lang === 'ar' ? selectedProduct.description : selectedProduct.descriptionEn}</p>
               </div>
               <div className="space-y-2.5">
-                <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:brightness-110 active:scale-95">
+                <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-xs font-bold text-white shadow-md transition-all duration-200 hover:brightness-105 active:scale-95">
                   <ShoppingBag size={16}/> {currentText.addToCart}
                 </button>
                 <button onClick={() => setSelectedProduct(null)} className="flex h-10 w-full items-center justify-center rounded-full border border-border text-xs font-semibold transition-all duration-200 hover:border-primary active:scale-95">
@@ -614,18 +679,59 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         <div className="fixed inset-0 z-50 grid place-items-center bg-primary/45 p-4 backdrop-blur-sm animate-fade-in" onClick={() => setModalPage('none')}>
           <div role="dialog" aria-modal="true" onClick={e => e.stopPropagation()} className="relative w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-3xl bg-background p-6 shadow-2xl border border-border/80 animate-scale-up">
             <button aria-label="Close modal" onClick={() => setModalPage('none')} className={`absolute top-4 z-10 grid h-8 w-8 place-items-center rounded-full bg-secondary text-foreground transition-all hover:bg-muted active:scale-90 ${lang === 'ar' ? 'left-4' : 'right-4'}`}><X size={16}/></button>
-            {modalPage === 'terms' ? (
+            {modalPage === 'privacy' ? (
+              <div className="space-y-4">
+                <h3 className="font-serif text-2xl font-bold flex items-center gap-2 text-primary"><ShieldCheck size={20}/> {currentText.privacyPolicy}</h3>
+                {lang === 'ar' ? (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">نحترم خصوصيتك. المتجر يحفظ المنتجات والسلة وطلباتك في مساحة التخزين المحلية لهذا المتصفح لتسهيل استخدام الموقع؛ لا تتم مزامنتها بين الأجهزة.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">عند تأكيد الطلب، نفتح واتساب برسالة تحتوي على معلومات التوصيل والمنتجات التي اخترتها لإرسالها إلينا. لا تدخل معلومات لا ترغب في مشاركتها عبر واتساب.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">يمكنك حذف البيانات المحلية بمسح بيانات الموقع من إعدادات المتصفح. حذفها لا يمحو الرسائل التي أرسلتها عبر واتساب.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">We respect your privacy. This store saves products, your cart, and orders in this browser's local storage to support the shopping experience; this data is not synced across devices.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">When you confirm an order, WhatsApp opens with a message containing your delivery details and selected products for you to send to us. Do not include information you do not want to share through WhatsApp.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">You can remove locally stored data by clearing this site's data in your browser settings. This does not delete messages you have sent through WhatsApp.</p>
+                  </>
+                )}
+              </div>
+            ) : modalPage === 'terms' ? (
               <div className="space-y-4">
                 <h3 className="font-serif text-2xl font-bold flex items-center gap-2 text-primary"><FileText size={20}/> {currentText.termsOfService}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{lang === 'ar' ? 'مرحباً بك في AR Accessories Co. باستخدامك لهذا الموقع وقيامك بالطلب، فإنك توافق على الالتزام بالشروط والأحكام الخاصة بالبيع والتوصيل داخل المغرب.' : 'Welcome to AR Accessories Co. By using this site and ordering, you agree to our terms of service and nationwide Moroccan delivery conditions.'}</p>
+                {lang === 'ar' ? (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">باستخدامك هذا المتجر، فإنك توافق على تقديم معلومات صحيحة عند الطلب والتواصل معنا لتأكيد تفاصيل التوصيل.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">تُعرض الأسعار بالدرهم المغربي. يتم تأكيد توفر المنتجات والسعر النهائي وتفاصيل الطلب عبر واتساب قبل الشحن، والدفع نقداً عند الاستلام.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">تُبذل العناية لضمان دقة أوصاف وصور المنتجات، وقد تختلف الألوان قليلاً حسب الشاشة. نحتفظ بحق تصحيح الأخطاء الواضحة في المعلومات المعروضة.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">By using this store, you agree to provide accurate order information and communicate with us to confirm delivery details.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Prices are displayed in Moroccan dirhams. Product availability, the final price, and order details are confirmed through WhatsApp before shipping. Payment is due in cash on delivery.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">We take care to keep product descriptions and images accurate, though colors may vary by screen. We reserve the right to correct clear errors in displayed information.</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
                 <h3 className="font-serif text-2xl font-bold flex items-center gap-2 text-primary"><RotateCcw size={20}/> {currentText.returnPolicy}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{lang === 'ar' ? 'نحن نضمن جودة منتجاتنا. في حال وجود عيب مصنعي أو خطأ في الطلب، نتيح لك الاستبدال أو الاسترجاع خلال 7 أيام من تاريخ الاستلام.' : 'We guarantee product quality. In case of manufacturing defect or wrong order, we allow exchange or return within 7 days of delivery.'}</p>
+                {lang === 'ar' ? (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">نوفر التوصيل إلى مدن المغرب، ونتواصل معك عبر واتساب لتأكيد الطلب وموعد التوصيل. الدفع نقداً عند الاستلام.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">إذا وصل منتج به عيب مصنعي أو استلمت منتجاً غير مطابق لطلبك، تواصل معنا خلال 7 أيام من الاستلام عبر واتساب مع رقم الطلب وصور توضح المشكلة، وسننسق معك بشأن الاستبدال أو الاسترجاع.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">يرجى الاحتفاظ بالمنتج وتغليفه بحالتهما الأصلية إلى حين التواصل معنا. تتم معالجة الطلبات بعد مراجعة الحالة وتأكيد التفاصيل.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground leading-relaxed">We deliver across Moroccan cities and contact you through WhatsApp to confirm your order and delivery timing. Payment is cash on delivery.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">If an item arrives with a manufacturing defect or does not match your order, contact us through WhatsApp within 7 days of delivery with your order details and photos showing the issue. We will coordinate an exchange or return with you.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Please keep the item and its packaging in their original condition while you contact us. Requests are handled after we review the issue and confirm the details.</p>
+                  </>
+                )}
               </div>
             )}
-            <button onClick={() => setModalPage('none')} className="mt-6 w-full rounded-full bg-primary py-3 text-xs font-semibold text-primary-foreground">{currentText.close}</button>
+            <button onClick={() => setModalPage('none')} className="mt-6 w-full rounded-full bg-linear-to-r from-orange-500 to-amber-600 py-3 text-xs font-bold text-white shadow-md transition hover:brightness-105">{currentText.close}</button>
           </div>
         </div>
       )}
@@ -646,39 +752,52 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         </div>
       </section>
 
-      <footer className="bg-primary text-primary-foreground">
+      <footer className="bg-zinc-900 text-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-9 sm:px-8 md:grid-cols-[1fr_auto_auto_auto] md:items-start">
           <div>
             <a href="#home" className="inline-flex items-center gap-2.5 transition-transform duration-200 active:scale-95">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-foreground font-serif font-bold text-primary">AR</span>
-              <b className="text-xs tracking-[0.12em]">AR ACCESSORIES CO.</b>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#F97316] p-1">
+                <img src="/icon.png" alt="" className="h-8 w-auto object-contain" />
+              </span>
             </a>
-            <p className="mt-3 max-w-xs text-xs leading-5 text-primary-foreground/75">{currentText.footerDesc}</p>
+            <p className="mt-3 max-w-xs text-xs leading-5 text-white/75">{currentText.footerDesc}</p>
           </div>
           <div>
-            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-primary-foreground/70">{currentText.quickLinks}</p>
+            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.quickLinks}</p>
             <div className="grid gap-2 text-xs">
-              <a className="transition hover:underline active:scale-95" href="#collection">{currentText.shopAll}</a>
-              <a className="transition hover:underline active:scale-95" href="#promise">{currentText.deliveryServices}</a>
+              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection">{currentText.shopAll}</a>
+              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#promise">{currentText.deliveryServices}</a>
             </div>
           </div>
           <div>
-            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-primary-foreground/70">{currentText.categoriesFooter}</p>
+            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.categoriesFooter}</p>
             <div className="grid gap-2 text-xs">
-              <a className="transition hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Jewellery')}><span className="inline-flex items-center gap-2"><Watch size={13}/> {currentText.jewellery}</span></a>
-              <a className="transition hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}><span className="inline-flex items-center gap-2"><Zap size={13}/> {currentText.sneakers}</span></a>
-              <a className="transition hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Audio')}><span className="inline-flex items-center gap-2"><Headphones size={13}/> {currentText.audio}</span></a>
+              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Jewellery')}><span className="inline-flex items-center gap-2"><Watch size={13}/> {currentText.jewellery}</span></a>
+              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}><span className="inline-flex items-center gap-2"><Zap size={13}/> {currentText.sneakers}</span></a>
+              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Audio')}><span className="inline-flex items-center gap-2"><Headphones size={13}/> {currentText.audio}</span></a>
             </div>
           </div>
           <div>
-            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-primary-foreground/70">{currentText.trustAndLegal}</p>
+            <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.trustAndLegal}</p>
             <div className="grid gap-2 text-xs">
-              <button onClick={() => setModalPage('terms')} className="text-left transition hover:underline active:scale-95">{currentText.termsOfService}</button>
-              <button onClick={() => setModalPage('returns')} className="text-left transition hover:underline active:scale-95">{currentText.returnPolicy}</button>
+              <button onClick={() => setModalPage('privacy')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.privacyPolicy}</button>
+              <button onClick={() => setModalPage('terms')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.termsOfService}</button>
+              <button onClick={() => setModalPage('returns')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.returnPolicy}</button>
             </div>
           </div>
         </div>
-        <div className="border-t border-primary-foreground/20 py-4 text-center text-[9px] text-primary-foreground/65">{currentText.footerRights}</div>
+        <div className="border-t border-white/20 py-4 text-center text-[9px] text-white/65">{currentText.footerRights}</div>
+        <div className="pb-4 text-center text-[10px] text-white/65">
+          Designed &amp; Developed by{' '}
+          <a
+            href="https://wa.me/212693222558?text=Bonjour%20MICO%2C%20je%20souhaite%20cr%C3%A9er%20un%20site%20web%20comme%20AR%20Accessories"
+            target="_blank"
+            rel="noreferrer"
+            className="font-bold text-orange-400 transition-colors hover:underline"
+          >
+            MICO
+          </a>
+        </div>
       </footer>
 
       {cartOpen && (
@@ -696,7 +815,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                 <span className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-secondary text-primary"><ShoppingBag size={24}/></span>
                 <p className="font-serif text-2xl">{currentText.emptyCart}</p>
                 <p className="mt-2 text-sm text-muted-foreground">{currentText.emptyCartDesc}</p>
-                <button onClick={() => setCartOpen(false)} className="mt-5 rounded-full bg-primary px-5 py-3 text-xs font-semibold text-primary-foreground active:scale-95 transition-transform duration-200">{currentText.browseProducts}</button>
+                <button onClick={() => setCartOpen(false)} className="mt-5 rounded-full bg-linear-to-r from-orange-500 to-amber-600 px-5 py-3 text-xs font-bold text-white shadow-md transition-transform duration-200 hover:brightness-105 active:scale-95">{currentText.browseProducts}</button>
               </div>
             ) : (
               <>
@@ -725,7 +844,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                     {appliedDiscount > 0 && <div className="flex justify-between text-emerald-600 font-medium"><span>{currentText.discount}</span><span>-{formatPrice(appliedDiscount)}</span></div>}
                     <div className="flex justify-between text-base font-bold pt-1 border-t border-border"><span>{currentText.totalAmount}</span><span>{formatPrice(total)}</span></div>
                   </div>
-                  <button onClick={() => { setCartOpen(false); setCheckoutOpen(true) }} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95">{currentText.checkoutBtn} <ArrowRight size={15}/></button>
+                  <button onClick={() => { setCartOpen(false); setCheckoutOpen(true) }} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-xs font-bold text-white shadow-md transition-all duration-200 hover:brightness-105 active:scale-95">{currentText.checkoutBtn} <ArrowRight size={15}/></button>
                 </div>
               </>
             )}
@@ -764,7 +883,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                 <span className="text-xs font-semibold flex items-center gap-1.5"><Tag size={13} className="text-primary"/> {currentText.havePromo}</span>
                 <div className="flex gap-2">
                   <input value={customer.promoCode} onChange={event => setCustomer(current => ({ ...current, promoCode: event.target.value }))} placeholder={currentText.promoPlaceholder} className="h-10 flex-1 rounded-xl border border-input bg-background px-3 text-xs uppercase outline-none focus:border-primary"/>
-                  <button type="button" onClick={applyPromo} className="h-10 px-4 rounded-xl bg-primary text-xs font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95">{currentText.applyBtn}</button>
+                  <button type="button" onClick={applyPromo} className="h-10 rounded-xl bg-linear-to-r from-orange-500 to-amber-600 px-4 text-xs font-bold text-white shadow-md transition hover:brightness-105 active:scale-95">{currentText.applyBtn}</button>
                 </div>
               </div>
 
@@ -794,7 +913,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
               <div className="flex justify-between text-sm font-bold pt-1 border-t border-border/60"><span>{currentText.totalAmount}</span><span>{formatPrice(total)}</span></div>
             </div>
 
-            <button disabled={busy} onClick={placeOrder} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-65">
+            <button disabled={busy} onClick={placeOrder} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-xs font-bold text-white shadow-md transition-all duration-200 hover:brightness-105 active:scale-95 disabled:opacity-65">
               {currentText.confirmOrder} <ArrowRight size={15}/>
             </button>
           </section>
