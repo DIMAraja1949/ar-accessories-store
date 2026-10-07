@@ -12,6 +12,8 @@ export type StoredProduct = {
   tagEn?: string
   description?: string
   descriptionEn?: string
+  sizes?: string[]
+  colors?: string[]
   createdAt?: string
 }
 

@@ -4,17 +4,21 @@ import { ClientOnly } from '@tanstack/react-router'
 import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe } from 'lucide-react'
 import { toast } from 'sonner'
 import { loadStoredProducts } from '@/lib/products-storage'
+import { getProductColorLabel } from '@/lib/product-variants'
+import { ProductVariantSelector } from '@/components/ProductVariantSelector'
 
-type Product = { id: string; name: string; nameEn: string; category: string; price: number; image: string; tag?: string; tagEn?: string; description: string; descriptionEn: string }
-type CartLine = { id: string; quantity: number }
-type CartItem = { product: Product; quantity: number }
+type Product = { id: string; name: string; nameEn: string; category: string; price: number; image: string; tag?: string; tagEn?: string; description: string; descriptionEn: string; sizes?: string[]; colors?: string[] }
+type CartLine = { id: string; quantity: number; size?: string; color?: string }
+type CartItem = { product: Product; quantity: number; size?: string; color?: string; lineKey: string }
 
 // Shop WhatsApp number (international format, no + or spaces)
 const WHATSAPP_NUMBER = '212610967239'
 
-const categories = ['All', 'Phone Cases', 'Smartwatches', 'Audio', 'Jewellery', 'Sneakers', 'Chargers']
+const categories = ['All', 'Accessories', 'Clothing', 'Phone Cases', 'Smartwatches', 'Audio', 'Jewellery', 'Sneakers', 'Chargers']
 const categoryLabels: Record<string, { ar: string; en: string }> = {
   All: { ar: 'الكل', en: 'All' },
+  Accessories: { ar: 'إكسسوارات', en: 'Accessories' },
+  Clothing: { ar: 'الملابس', en: 'Clothing' },
   'Phone Cases': { ar: 'أغطية الهاتف', en: 'Phone Cases' },
   Smartwatches: { ar: 'ساعات ذكية', en: 'Smartwatches' },
   Audio: { ar: 'صوتيات', en: 'Audio' },
@@ -24,24 +28,30 @@ const categoryLabels: Record<string, { ar: string; en: string }> = {
 }
 
 const formatPrice = (price: number) => `${price.toLocaleString('fr-MA')} DH`
+const cartLineKey = (line: CartLine) => JSON.stringify([line.id, line.size ?? '', line.color ?? ''])
 
 export const Route = createFileRoute('/')({
-  head: () => ({ meta: [{ title: 'AR Accessories Co. — Troc, Tech & Lifestyle Maroc' }, { name: 'description', content: 'Discover thoughtfully selected accessories, jewellery, sneakers and tech with fast delivery across all cities in Morocco.' }] }),
+  head: () => ({ meta: [{ title: 'AR Accessories Co. — Troc, Tech & Lifestyle Maroc' }, { name: 'description', content: 'Discover clothing, accessories, jewellery, sneakers and tech with fast delivery across all cities in Morocco.' }] }),
   component: () => <ClientOnly fallback={<div className="min-h-dvh animate-pulse bg-background" />}><Storefront /></ClientOnly>,
 })
 
 function Storefront() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar')
-  // The cart only stores product ids + quantities. Names and prices always come from saved products.
+  // Cart lines store product ids and selected variants; names and prices always come from saved products.
   const [cartLines, setCartLines] = useState<CartLine[]>(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem('ar-cart') || '[]') as Array<{ id?: string; quantity?: number; product?: { id?: string } }>
+      const parsed = JSON.parse(localStorage.getItem('ar-cart') || '[]') as Array<{ id?: string; quantity?: number; size?: string; color?: string; product?: { id?: string } }>
       if (!Array.isArray(parsed)) return []
       return parsed.flatMap(item => {
         const id = item?.id ?? item?.product?.id
         const quantity = Number(item?.quantity)
         return id && Number.isFinite(quantity) && quantity > 0
-          ? [{ id: String(id), quantity: Math.max(1, Math.min(99, Math.floor(quantity))) }]
+          ? [{
+              id: String(id),
+              quantity: Math.max(1, Math.min(99, Math.floor(quantity))),
+              ...(typeof item.size === 'string' ? { size: item.size } : {}),
+              ...(typeof item.color === 'string' ? { color: item.color } : {}),
+            }]
           : []
       })
     } catch { return [] }
@@ -56,6 +66,8 @@ function Storefront() {
   const [cartOpen, setCartOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [selectedSize, setSelectedSize] = useState('')
+  const [selectedColor, setSelectedColor] = useState('')
   const [modalPage, setModalPage] = useState<'none' | 'privacy' | 'terms' | 'returns'>('none')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -84,6 +96,8 @@ function Storefront() {
             tagEn: row.tagEn,
             description: row.description || '',
             descriptionEn: row.descriptionEn || row.description || '',
+            sizes: row.sizes,
+            colors: row.colors,
           }))
         if (active) {
           setStoreProducts(saved)
@@ -115,6 +129,8 @@ function Storefront() {
       jewellery: 'مجوهرات',
       sneakers: 'أحذية',
       audio: 'صوتيات',
+      clothing: 'الملابس',
+      accessories: 'إكسسوارات',
       searchPlaceholder: 'ابحث عن منتج، ساعة، حذاء...',
       bag: 'السلة',
       welcome: 'مرحباً بك في متجرك المفضل بالمغرب',
@@ -127,7 +143,7 @@ function Storefront() {
       nationalDelivery: 'توصيل لجميع المدن',
       collections: 'المجموعات المتوفرة',
       chooseTaste: 'اختر ما يناسب ذوقك.',
-      collectionsDesc: 'تشكيلة واسعة من المجوهرات، الأحذية، والأجهزة الذكية.',
+      collectionsDesc: 'تشكيلة واسعة من الملابس، الأكسسوارات، المجوهرات، والأجهزة الذكية.',
       quickView: 'نظرة سريعة',
       loadingProducts: 'جاري تحميل المنتجات...',
       loadError: 'تعذر تحميل المنتجات حالياً.',
@@ -145,7 +161,7 @@ function Storefront() {
       whatsappDesc: 'بعد إرسال طلبك نتواصل معك على واتساب لتأكيد التفاصيل وموعد التوصيل.',
       nationalCoverTitle: 'توصيل وطني شامل',
       nationalCoverDesc: 'نغطي جميع مدن وقرى المملكة المغربية بسرعة واحترافية.',
-      footerDesc: 'متجرك المفضل للأكسسوارات والمجوهرات والأجهزة الذكية مع التوصيل لجميع المدن المغربية.',
+      footerDesc: 'متجرك المفضل للملابس والأكسسوارات والمجوهرات والأجهزة الذكية مع التوصيل لجميع المدن المغربية.',
       quickLinks: 'روابط سريعة',
       categoriesFooter: 'الأقسام',
       trustAndLegal: 'الثقة والقانون',
@@ -184,6 +200,8 @@ function Storefront() {
       jewellery: 'Jewellery',
       sneakers: 'Sneakers',
       audio: 'Audio',
+      clothing: 'Clothing',
+      accessories: 'Accessories',
       searchPlaceholder: 'Search product, watch, sneakers...',
       bag: 'Bag',
       welcome: 'Welcome to your favorite store in Morocco',
@@ -196,7 +214,7 @@ function Storefront() {
       nationalDelivery: 'Nationwide Delivery',
       collections: 'Available Collections',
       chooseTaste: 'Choose what fits your style.',
-      collectionsDesc: 'A wide selection of jewellery, sneakers and smart devices.',
+      collectionsDesc: 'A wide selection of clothing, accessories, jewellery and smart devices.',
       quickView: 'Quick View',
       loadingProducts: 'Loading products...',
       loadError: 'Products could not be loaded right now.',
@@ -214,7 +232,7 @@ function Storefront() {
       whatsappDesc: 'After you send your order we contact you on WhatsApp to confirm the details and delivery time.',
       nationalCoverTitle: 'Nationwide Shipping',
       nationalCoverDesc: 'We cover all cities and towns across the Kingdom of Morocco swiftly.',
-      footerDesc: 'Your favorite store for accessories, jewellery and smart tech with delivery across all Moroccan cities.',
+      footerDesc: 'Your favorite store for clothing, accessories, jewellery and smart tech with delivery across all Moroccan cities.',
       quickLinks: 'Quick Links',
       categoriesFooter: 'Categories',
       trustAndLegal: 'Trust & Legal',
@@ -253,7 +271,8 @@ function Storefront() {
 
   const filteredProducts = useMemo(() => {
     let result = storeProducts.filter(product =>
-      (category === 'All' || product.category === category) &&
+      (category === 'All'
+        || (category === 'Accessories' ? product.category !== 'Clothing' : product.category === category)) &&
       `${product.name} ${product.nameEn} ${product.category}`.toLowerCase().includes(search.trim().toLowerCase()),
     )
 
@@ -270,7 +289,7 @@ function Storefront() {
   const cart: CartItem[] = useMemo(
     () => cartLines.flatMap(line => {
       const product = storeProducts.find(item => item.id === line.id)
-      return product ? [{ product, quantity: line.quantity }] : []
+      return product ? [{ product, quantity: line.quantity, size: line.size, color: line.color, lineKey: cartLineKey(line) }] : []
     }),
     [cartLines, storeProducts],
   )
@@ -281,21 +300,45 @@ function Storefront() {
   const appliedDiscount = appliedPromo === 'AR10' ? Math.round(subtotal * 0.1) : appliedPromo === 'FREESHIP' ? Math.min(50, subtotal) : 0
   const total = Math.max(0, subtotal - appliedDiscount)
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, variant: { size?: string; color?: string } = {}) => {
+    if (product.category === 'Clothing' && (!variant.size || !variant.color)) {
+      toast.error(lang === 'ar' ? 'اختار المقاس واللون قبل الإضافة إلى السلة.' : 'Choose a size and color before adding this item.')
+      return false
+    }
+    const nextLine: CartLine = { id: product.id, quantity: 1, ...variant }
+    const key = cartLineKey(nextLine)
     setCartLines(current => {
-      const existing = current.find(line => line.id === product.id)
+      const existing = current.find(line => cartLineKey(line) === key)
       return existing
-        ? current.map(line => line.id === product.id ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line)
-        : [...current, { id: product.id, quantity: 1 }]
+        ? current.map(line => cartLineKey(line) === key ? { ...line, quantity: Math.min(99, line.quantity + 1) } : line)
+        : [...current, nextLine]
     })
-    toast.success(lang === 'ar' ? 'تمت الإضافة إلى السلة' : 'Added to your bag', { description: lang === 'ar' ? product.name : product.nameEn })
+    const selectedOptions = [variant.size, variant.color].filter(Boolean).join(' · ')
+    toast.success(lang === 'ar' ? 'تمت الإضافة إلى السلة' : 'Added to your bag', {
+      description: [lang === 'ar' ? product.name : product.nameEn, selectedOptions].filter(Boolean).join(' · '),
+    })
+    return true
   }
 
-  const updateQuantity = (id: string, change: number) => setCartLines(current => current.flatMap(line => {
-    if (line.id !== id) return [line]
+  const updateQuantity = (key: string, change: number) => setCartLines(current => current.flatMap(line => {
+    if (cartLineKey(line) !== key) return [line]
     const quantity = Math.min(99, line.quantity + change)
     return quantity > 0 ? [{ ...line, quantity }] : []
   }))
+
+  const openProduct = (product: Product) => {
+    setSelectedProduct(product)
+    setSelectedSize(product.sizes?.[0] ?? '')
+    setSelectedColor(product.colors?.[0] ?? '')
+  }
+
+  const addSelectedProductToCart = () => {
+    if (!selectedProduct) return
+    const added = addToCart(selectedProduct, selectedProduct.category === 'Clothing'
+      ? { size: selectedSize, color: selectedColor }
+      : {})
+    if (added) setSelectedProduct(null)
+  }
 
   const applyPromo = () => {
     const code = customer.promoCode.trim().toUpperCase()
@@ -325,7 +368,7 @@ function Storefront() {
     }
 
     const orderItems = cart.map(item =>
-      `- ${lang === 'ar' ? item.product.name : item.product.nameEn} x ${item.quantity} = ${formatPrice(item.product.price * item.quantity)}`,
+      `- ${lang === 'ar' ? item.product.name : item.product.nameEn}${item.size ? ` (${lang === 'ar' ? 'المقاس' : 'Size'}: ${item.size})` : ''}${item.color ? ` (${lang === 'ar' ? 'اللون' : 'Color'}: ${item.color})` : ''} x ${item.quantity} = ${formatPrice(item.product.price * item.quantity)}`,
     ).join('\n')
     const discountLine = appliedDiscount > 0 ? `\n${lang === 'ar' ? 'التخفيض' : 'Discount'}: -${formatPrice(appliedDiscount)}` : ''
     const waMessage = `${lang === 'ar' ? 'السلام عليكم، أريد تأكيد طلبي:' : 'Hello, I would like to confirm my order:'}
@@ -356,7 +399,14 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
           customerName: customer.name.trim(),
           phone: customer.phone.trim(),
           address: `${customer.city.trim()} - ${customer.address.trim()}`,
-          itemsJson: JSON.stringify(cart.map(item => ({ id: item.product.id, name: item.product.name, quantity: item.quantity, price: item.product.price }))),
+          itemsJson: JSON.stringify(cart.map(item => ({
+            id: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+            ...(item.size ? { size: item.size } : {}),
+            ...(item.color ? { color: item.color } : {}),
+          }))),
           totalAmount: total,
           status: 'pending',
           createdAt: new Date().toISOString(),
@@ -394,12 +444,12 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         target="_blank"
         rel="noreferrer"
         aria-label="Contact Customer Support via WhatsApp"
-        className={`fixed bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#EA580C] text-white shadow-2xl ring-2 ring-[#F97316]/70 ring-offset-2 ring-offset-background transition-all duration-300 hover:scale-110 hover:ring-[#EA580C] active:scale-95 ${lang === 'ar' ? 'left-6' : 'right-6'}`}
+        className={`fixed bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-orange-dark text-white shadow-2xl ring-2 ring-orange/70 ring-offset-2 ring-offset-background transition-all duration-300 hover:scale-110 hover:ring-orange-dark active:scale-95 ${lang === 'ar' ? 'left-6' : 'right-6'}`}
       >
         <MessageCircle size={28}/>
       </a>
 
-      <div className="relative bg-linear-to-r from-zinc-900 via-[#EA580C] to-zinc-900 px-4 py-2.5 text-center text-xs font-medium text-white shadow-inner">
+      <div className="relative bg-linear-to-r from-zinc-900 via-orange-dark to-zinc-900 px-4 py-2.5 text-center text-xs font-medium text-white shadow-inner">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 flex-wrap">
           <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
             <Sparkles size={12} className="text-orange-200"/> Maroc Delivery
@@ -441,6 +491,8 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
           </a>
           <nav className={`hidden items-center gap-7 text-xs font-medium text-muted-foreground lg:flex ${lang === 'ar' ? 'mr-5' : 'ml-5'}`}>
             <a className="transition hover:text-foreground active:scale-95" href="#collection">{currentText.shopAll}</a>
+            <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Accessories')}>{currentText.accessories}</a>
+            <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Clothing')}>{currentText.clothing}</a>
             <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Jewellery')}>{currentText.jewellery}</a>
             <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}>{currentText.sneakers}</a>
             <a className="transition hover:text-foreground active:scale-95" href="#collection" onClick={() => setCategory('Audio')}>{currentText.audio}</a>
@@ -470,9 +522,9 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         aria-hidden={!mobileMenuOpen}
         inert={!mobileMenuOpen}
         dir={lang === 'ar' ? 'rtl' : 'ltr'}
-        className={`fixed inset-y-0 left-0 z-[60] flex w-[min(84vw,22rem)] flex-col bg-background text-foreground shadow-2xl transition-transform duration-300 ease-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-60 flex w-[min(84vw,22rem)] flex-col bg-background text-foreground shadow-2xl transition-transform duration-300 ease-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        <div className="flex min-h-20 items-center justify-between gap-3 border-b border-[#EA580C]/30 bg-[#F97316] px-5 text-white">
+        <div className="flex min-h-20 items-center justify-between gap-3 border-b border-orange-dark/30 bg-orange px-5 text-white">
           <h2 className="text-sm font-bold tracking-[0.08em]">
             {lang === 'ar' ? 'قائمة التنقل' : 'MENU DE NAVIGATION'}
           </h2>
@@ -505,6 +557,10 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
           <a href="#collection" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
             <BookOpen size={18} className="text-primary" />
             {lang === 'ar' ? 'المدونة والأقسام' : 'Blog / Categories'}
+          </a>
+          <a href="#collection" onClick={() => { setCategory('Clothing'); setMobileMenuOpen(false) }} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary">
+            <Sparkles size={18} className="text-primary" />
+            {currentText.clothing}
           </a>
         </nav>
       </aside>
@@ -611,7 +667,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
               {filteredProducts.map((product, index) => (
                 <article key={product.id} className="group overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                   <div
-                    onClick={() => setSelectedProduct(product)}
+                    onClick={() => openProduct(product)}
                     className="relative aspect-[0.91] overflow-hidden bg-secondary cursor-pointer"
                     title="Click to view product details"
                   >
@@ -626,10 +682,10 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                   </div>
                   <div className="p-3.5 sm:p-4">
                     <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{categoryLabel(product.category)}</p>
-                    <h3 onClick={() => setSelectedProduct(product)} className="min-h-10 text-sm font-semibold leading-5 cursor-pointer hover:text-primary transition-colors">{lang === 'ar' ? product.name : product.nameEn}</h3>
+                    <h3 onClick={() => openProduct(product)} className="min-h-10 text-sm font-semibold leading-5 cursor-pointer hover:text-primary transition-colors">{lang === 'ar' ? product.name : product.nameEn}</h3>
                     <div className="mt-3 flex items-center justify-between gap-1">
                       <span className="text-sm font-bold">{formatPrice(product.price)}</span>
-                      <button onClick={() => addToCart(product)} aria-label="Add product to cart" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-white font-bold shadow-md transition-transform duration-200 hover:scale-110 hover:brightness-105 active:scale-90"><Plus size={17}/></button>
+                      <button onClick={() => product.category === 'Clothing' ? openProduct(product) : addToCart(product)} aria-label="Add product to cart" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-white font-bold shadow-md transition-transform duration-200 hover:scale-110 hover:brightness-105 active:scale-90"><Plus size={17}/></button>
                     </div>
                     <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{lang === 'ar' ? product.description : product.descriptionEn}</p>
                   </div>
@@ -649,7 +705,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
 
       {selectedProduct && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-primary/45 p-4 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedProduct(null)}>
-          <div role="dialog" aria-modal="true" onClick={e => e.stopPropagation()} className="relative w-full max-w-2xl overflow-hidden rounded-3xl bg-background shadow-2xl border border-border/80 grid md:grid-cols-2 animate-scale-up">
+          <div role="dialog" aria-modal="true" onClick={e => e.stopPropagation()} className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-background shadow-2xl border border-border/80 grid md:grid-cols-2 animate-scale-up">
             <button aria-label="Close modal" onClick={() => setSelectedProduct(null)} className={`absolute top-4 z-10 grid h-9 w-9 place-items-center rounded-full bg-background/80 text-foreground backdrop-blur-md shadow-md transition-all hover:bg-muted active:scale-90 ${lang === 'ar' ? 'left-4' : 'right-4'}`}><X size={18}/></button>
             <div className="relative aspect-square bg-secondary overflow-hidden">
               <img src={selectedProduct.image} alt="" className="h-full w-full object-cover"/>
@@ -661,9 +717,20 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                 <h3 className="font-serif text-2xl sm:text-3xl leading-tight mb-3">{lang === 'ar' ? selectedProduct.name : selectedProduct.nameEn}</h3>
                 <p className="text-xl font-bold mb-4 text-primary">{formatPrice(selectedProduct.price)}</p>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6">{lang === 'ar' ? selectedProduct.description : selectedProduct.descriptionEn}</p>
+                {selectedProduct.category === 'Clothing' && (
+                  <ProductVariantSelector
+                    sizes={selectedProduct.sizes}
+                    colors={selectedProduct.colors}
+                    selectedSize={selectedSize}
+                    selectedColor={selectedColor}
+                    lang={lang}
+                    onSizeChange={setSelectedSize}
+                    onColorChange={setSelectedColor}
+                  />
+                )}
               </div>
               <div className="space-y-2.5">
-                <button onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-xs font-bold text-white shadow-md transition-all duration-200 hover:brightness-105 active:scale-95">
+                <button onClick={addSelectedProductToCart} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-500 to-amber-600 text-xs font-bold text-white shadow-md transition-all duration-200 hover:brightness-105 active:scale-95">
                   <ShoppingBag size={16}/> {currentText.addToCart}
                 </button>
                 <button onClick={() => setSelectedProduct(null)} className="flex h-10 w-full items-center justify-center rounded-full border border-border text-xs font-semibold transition-all duration-200 hover:border-primary active:scale-95">
@@ -756,7 +823,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-9 sm:px-8 md:grid-cols-[1fr_auto_auto_auto] md:items-start">
           <div>
             <a href="#home" className="inline-flex items-center gap-2.5 transition-transform duration-200 active:scale-95">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#F97316] p-1">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-orange p-1">
                 <img src="/icon.png" alt="" className="h-8 w-auto object-contain" />
               </span>
             </a>
@@ -765,24 +832,24 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
           <div>
             <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.quickLinks}</p>
             <div className="grid gap-2 text-xs">
-              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection">{currentText.shopAll}</a>
-              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#promise">{currentText.deliveryServices}</a>
+              <a className="transition hover:text-orange hover:underline active:scale-95" href="#collection">{currentText.shopAll}</a>
+              <a className="transition hover:text-orange hover:underline active:scale-95" href="#promise">{currentText.deliveryServices}</a>
             </div>
           </div>
           <div>
             <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.categoriesFooter}</p>
             <div className="grid gap-2 text-xs">
-              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Jewellery')}><span className="inline-flex items-center gap-2"><Watch size={13}/> {currentText.jewellery}</span></a>
-              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}><span className="inline-flex items-center gap-2"><Zap size={13}/> {currentText.sneakers}</span></a>
-              <a className="transition hover:text-[#F97316] hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Audio')}><span className="inline-flex items-center gap-2"><Headphones size={13}/> {currentText.audio}</span></a>
+              <a className="transition hover:text-orange hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Jewellery')}><span className="inline-flex items-center gap-2"><Watch size={13}/> {currentText.jewellery}</span></a>
+              <a className="transition hover:text-orange hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Sneakers')}><span className="inline-flex items-center gap-2"><Zap size={13}/> {currentText.sneakers}</span></a>
+              <a className="transition hover:text-orange hover:underline active:scale-95" href="#collection" onClick={() => setCategory('Audio')}><span className="inline-flex items-center gap-2"><Headphones size={13}/> {currentText.audio}</span></a>
             </div>
           </div>
           <div>
             <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">{currentText.trustAndLegal}</p>
             <div className="grid gap-2 text-xs">
-              <button onClick={() => setModalPage('privacy')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.privacyPolicy}</button>
-              <button onClick={() => setModalPage('terms')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.termsOfService}</button>
-              <button onClick={() => setModalPage('returns')} className="text-left transition hover:text-[#F97316] hover:underline active:scale-95">{currentText.returnPolicy}</button>
+              <button onClick={() => setModalPage('privacy')} className="text-left transition hover:text-orange hover:underline active:scale-95">{currentText.privacyPolicy}</button>
+              <button onClick={() => setModalPage('terms')} className="text-left transition hover:text-orange hover:underline active:scale-95">{currentText.termsOfService}</button>
+              <button onClick={() => setModalPage('returns')} className="text-left transition hover:text-orange hover:underline active:scale-95">{currentText.returnPolicy}</button>
             </div>
           </div>
         </div>
@@ -821,16 +888,24 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
               <>
                 <div className="flex-1 space-y-4 overflow-y-auto p-5">
                   {cart.map(item => (
-                    <div key={item.product.id} className="flex gap-4 border-b border-border pb-4">
+                    <div key={item.lineKey} className="flex gap-4 border-b border-border pb-4">
                       <img src={item.product.image} alt="" className="h-24 w-20 rounded-xl object-cover"/>
                       <div className="flex min-w-0 flex-1 flex-col">
                         <p className="text-sm font-semibold">{lang === 'ar' ? item.product.name : item.product.nameEn}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatPrice(item.product.price)}</p>
+                        {(item.size || item.color) && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {[
+                              item.size && `${lang === 'ar' ? 'المقاس' : 'Size'}: ${item.size}`,
+                              item.color && `${lang === 'ar' ? 'اللون' : 'Color'}: ${getProductColorLabel(item.color, lang)}`,
+                            ].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
                         <div className="mt-auto flex items-center justify-between">
                           <div className="flex items-center gap-1 rounded-full border border-border">
-                            <button aria-label="Remove one" onClick={() => updateQuantity(item.product.id, -1)} className="p-2 active:scale-75 transition-transform"><Minus size={12}/></button>
+                            <button aria-label="Remove one" onClick={() => updateQuantity(item.lineKey, -1)} className="p-2 active:scale-75 transition-transform"><Minus size={12}/></button>
                             <span className="min-w-4 text-center text-xs">{item.quantity}</span>
-                            <button aria-label="Add one" onClick={() => updateQuantity(item.product.id, 1)} className="p-2 active:scale-125 transition-transform"><Plus size={12}/></button>
+                            <button aria-label="Add one" onClick={() => updateQuantity(item.lineKey, 1)} className="p-2 active:scale-125 transition-transform"><Plus size={12}/></button>
                           </div>
                           <b className="text-sm">{formatPrice(item.product.price * item.quantity)}</b>
                         </div>

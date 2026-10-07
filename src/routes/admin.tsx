@@ -9,7 +9,7 @@ const ADMIN_AUTH_KEY = 'ar-admin-auth' // نفس المفتاح المستعمل
 
 type ProductRow = StoredProduct
 
-const emptyForm = { name: '', category: 'Phone Cases', price: '', stock: '10', image: '', description: '' }
+const emptyForm = { name: '', category: 'Phone Cases', price: '', stock: '10', image: '', description: '', sizes: '', colors: '' }
 
 // المنتجات التجريبية اللي كانت مكتوبة فالكود؛ كيتستوردو مرة وحدة باش يولّيو قابلين للتعديل والحذف
 const demoProducts = [
@@ -21,6 +21,9 @@ const demoProducts = [
   { name: 'سماعات استوديو برو', category: 'Audio', price: 549, image: 'https://images.unsplash.com/photo-1600375104627-c94c416deefa?auto=format&fit=crop&w=900&q=85', description: 'سماعات لاسلكية مدمجة لمكالمات واضحة وصوت غني.' },
   { name: 'سبادريل الجري الكلاسيكي', category: 'Sneakers', price: 899, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85', description: 'حذاء رياضي خفيف مصمم للتمارين اليومية والمظهر العصري السهل.' },
   { name: 'شاحن مكتب مغناطيسي', category: 'Chargers', price: 329, image: 'https://images.unsplash.com/photo-1642418714495-87fcca453f70?auto=format&fit=crop&w=900&q=85', description: 'رفيق شحن أنيق يحافظ على طاقة أجهزتك ومكتبك منظماً.' },
+  { name: 'هودي ستريت وير', nameEn: 'Everyday Streetwear Hoodie', category: 'Clothing', price: 349, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=85', description: 'هودي قطني دافئ بقصة مريحة ولمسة عصرية، مناسب للخروج اليومي.', descriptionEn: 'A soft cotton hoodie with a relaxed fit, made for comfortable everyday layering.', sizes: ['S', 'M', 'L', 'XL'], colors: ['Black', 'Cream', 'Olive'] },
+  { name: 'تيشيرت أساسي من القطن', nameEn: 'Essential Cotton T-Shirt', category: 'Clothing', price: 189, image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85', description: 'تيشيرت قطني خفيف وناعم، ساهل يتلبس مع أي إطلالة.', descriptionEn: 'A lightweight, soft cotton tee that pairs easily with your everyday looks.', sizes: ['S', 'M', 'L', 'XL'], colors: ['White', 'Black', 'Beige'] },
+  { name: 'قميجة كتان للصيف', nameEn: 'Relaxed Linen Shirt', category: 'Clothing', price: 329, image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85', description: 'قميجة كتان بقصة مرتاحة، كتخليك مرتاح وأنيق فالأيام الدافئة.', descriptionEn: 'A breathable relaxed-fit linen shirt for effortless warm-weather style.', sizes: ['S', 'M', 'L', 'XL'], colors: ['Cream', 'Olive', 'Navy'] },
 ]
 
 export const Route = createFileRoute('/admin')({
@@ -118,6 +121,8 @@ function AdminDashboardRoute() {
       stock: String(row.stock ?? 10),
       image: row.image ?? '',
       description: row.description ?? '',
+      sizes: row.sizes?.join(', ') ?? '',
+      colors: row.colors?.join(', ') ?? '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -137,6 +142,12 @@ function AdminDashboardRoute() {
       toast.error('اختار صورة للمنتج قبل الحفظ.')
       return
     }
+    const sizes = form.sizes.split(',').map(size => size.trim()).filter(Boolean)
+    const colors = form.colors.split(',').map(color => color.trim()).filter(Boolean)
+    if (form.category === 'Clothing' && (sizes.length === 0 || colors.length === 0)) {
+      toast.error('دخل المقاسات والألوان المتوفرة للملابس.')
+      return
+    }
     setLoading(true)
     const data = {
       name: form.name.trim(),
@@ -145,6 +156,8 @@ function AdminDashboardRoute() {
       stock: Number.parseInt(form.stock || '10', 10),
       image: form.image,
       description: form.description.trim(),
+      sizes: form.category === 'Clothing' ? sizes : undefined,
+      colors: form.category === 'Clothing' ? colors : undefined,
     }
     try {
       const rows = loadStoredProducts()
@@ -177,7 +190,7 @@ function AdminDashboardRoute() {
   }
 
   const importDemoProducts = async () => {
-    if (!window.confirm('غادي نضيفو 8 منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟')) return
+    if (!window.confirm(`غادي نضيفو ${demoProducts.length} منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟`)) return
     setSeeding(true)
     try {
       const rows = loadStoredProducts()
@@ -268,9 +281,22 @@ function AdminDashboardRoute() {
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">القسم</label>
                 <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full h-12 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
-                  <option value="Phone Cases">Phone Cases</option><option value="Smartwatches">Smartwatches</option><option value="Audio">Audio</option><option value="Jewellery">Jewellery</option><option value="Sneakers">Sneakers</option><option value="Chargers">Chargers</option>
+                  <option value="Phone Cases">Phone Cases</option><option value="Smartwatches">Smartwatches</option><option value="Audio">Audio</option><option value="Jewellery">Jewellery</option><option value="Sneakers">Sneakers</option><option value="Chargers">Chargers</option><option value="Clothing">Clothing / الملابس</option>
                 </select>
               </div>
+
+              {form.category === 'Clothing' && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">المقاسات (افصل بينها بفاصلة)</span>
+                    <input value={form.sizes} onChange={e => setForm({ ...form, sizes: e.target.value })} placeholder="S, M, L, XL" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">الألوان (افصل بينها بفاصلة)</span>
+                    <input value={form.colors} onChange={e => setForm({ ...form, colors: e.target.value })} placeholder="Black, Cream, Olive" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                  </label>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
