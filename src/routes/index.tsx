@@ -77,7 +77,7 @@ function Storefront() {
 
   useEffect(() => { localStorage.setItem('ar-cart', JSON.stringify(cartLines)) }, [cartLines])
 
-  // Load the products saved from /admin.
+  // Load the locally saved catalog, seeding the built-in defaults for new visitors.
   useEffect(() => {
     let active = true
     const loadStoreProducts = async () => {

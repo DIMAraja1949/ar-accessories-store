@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { loadStoredProducts, saveStoredProducts, type StoredProduct } from '@/lib/products-storage'
+import { DEFAULT_PRODUCTS, loadStoredProducts, saveStoredProducts, type StoredProduct } from '@/lib/products-storage'
 
 const ADMIN_PASSWORD = 'Simo2026'
 const ADMIN_AUTH_KEY = 'ar-admin-auth' // نفس المفتاح المستعمل فـ index.tsx
@@ -10,21 +10,6 @@ const ADMIN_AUTH_KEY = 'ar-admin-auth' // نفس المفتاح المستعمل
 type ProductRow = StoredProduct
 
 const emptyForm = { name: '', category: 'Phone Cases', price: '', stock: '10', image: '', description: '', sizes: '', colors: '' }
-
-// المنتجات التجريبية اللي كانت مكتوبة فالكود؛ كيتستوردو مرة وحدة باش يولّيو قابلين للتعديل والحذف
-const demoProducts = [
-  { name: 'Everyday Mag Case', category: 'Phone Cases', price: 249, image: 'https://images.unsplash.com/photo-1601592690120-a7cefd9c477a?auto=format&fit=crop&w=900&q=85', description: 'كوري سليم وحامي مع لمسة مطفية مريحة للاستعمال اليومي.' },
-  { name: 'ساعة ذكية نشطة', category: 'Smartwatches', price: 899, image: 'https://images.unsplash.com/photo-1750776100861-30c172651817?auto=format&fit=crop&w=900&q=85', description: 'ساعة يومية متعددة الاستخدامات بشاشة واضحة وتتبع للنشاط طوال اليوم.' },
-  { name: 'سوار معدني مينيمالست', category: 'Jewellery', price: 349, image: 'https://images.unsplash.com/photo-1611591475871-2ee8ab22349a?auto=format&fit=crop&w=900&q=85', description: 'مصمم خصيصاً لأناقة يومية راقية من الستانلس ستيل.' },
-  { name: 'خاتم فضي كلاسيكي', category: 'Jewellery', price: 299, image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=900&q=85', description: 'خاتم فضي مصقول بأسلوب كلاسيكي هادئ وراقي.' },
-  { name: 'حذاء جلدي عصري', category: 'Sneakers', price: 1199, image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=900&q=85', description: 'أحذية جلدية فاخرة تجمع بين الراحة القصوى والتصميم الحضري النظيف.' },
-  { name: 'سماعات استوديو برو', category: 'Audio', price: 549, image: 'https://images.unsplash.com/photo-1600375104627-c94c416deefa?auto=format&fit=crop&w=900&q=85', description: 'سماعات لاسلكية مدمجة لمكالمات واضحة وصوت غني.' },
-  { name: 'سبادريل الجري الكلاسيكي', category: 'Sneakers', price: 899, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85', description: 'حذاء رياضي خفيف مصمم للتمارين اليومية والمظهر العصري السهل.' },
-  { name: 'شاحن مكتب مغناطيسي', category: 'Chargers', price: 329, image: 'https://images.unsplash.com/photo-1642418714495-87fcca453f70?auto=format&fit=crop&w=900&q=85', description: 'رفيق شحن أنيق يحافظ على طاقة أجهزتك ومكتبك منظماً.' },
-  { name: 'هودي ستريت وير', nameEn: 'Everyday Streetwear Hoodie', category: 'Clothing', price: 349, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=85', description: 'هودي قطني دافئ بقصة مريحة ولمسة عصرية، مناسب للخروج اليومي.', descriptionEn: 'A soft cotton hoodie with a relaxed fit, made for comfortable everyday layering.', sizes: ['S', 'M', 'L', 'XL'], colors: ['Black', 'Cream', 'Olive'] },
-  { name: 'تيشيرت أساسي من القطن', nameEn: 'Essential Cotton T-Shirt', category: 'Clothing', price: 189, image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85', description: 'تيشيرت قطني خفيف وناعم، ساهل يتلبس مع أي إطلالة.', descriptionEn: 'A lightweight, soft cotton tee that pairs easily with your everyday looks.', sizes: ['S', 'M', 'L', 'XL'], colors: ['White', 'Black', 'Beige'] },
-  { name: 'قميجة كتان للصيف', nameEn: 'Relaxed Linen Shirt', category: 'Clothing', price: 329, image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85', description: 'قميجة كتان بقصة مرتاحة، كتخليك مرتاح وأنيق فالأيام الدافئة.', descriptionEn: 'A breathable relaxed-fit linen shirt for effortless warm-weather style.', sizes: ['S', 'M', 'L', 'XL'], colors: ['Cream', 'Olive', 'Navy'] },
-]
 
 export const Route = createFileRoute('/admin')({
   component: AdminDashboardRoute,
@@ -190,16 +175,16 @@ function AdminDashboardRoute() {
   }
 
   const importDemoProducts = async () => {
-    if (!window.confirm(`غادي نضيفو ${demoProducts.length} منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟`)) return
+    if (!window.confirm(`غادي نضيفو ${DEFAULT_PRODUCTS.length} منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟`)) return
     setSeeding(true)
     try {
       const rows = loadStoredProducts()
       const existing = new Set(rows.map(item => item.name))
       const addedProducts: ProductRow[] = []
       let added = 0
-      for (const product of demoProducts) {
+      for (const product of DEFAULT_PRODUCTS) {
         if (existing.has(product.name)) continue
-        addedProducts.push({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), stock: 10, ...product })
+        addedProducts.push({ ...product, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
         added += 1
       }
       saveStoredProducts([...rows, ...addedProducts])
