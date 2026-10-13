@@ -2,14 +2,43 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { DEFAULT_PRODUCTS, loadStoredProducts, saveStoredProducts, type StoredProduct } from '@/lib/products-storage'
-
-const ADMIN_PASSWORD = 'Simo2026'
-const ADMIN_AUTH_KEY = 'ar-admin-auth' // نفس المفتاح المستعمل فـ index.tsx
+import {
+  DEFAULT_PRODUCTS,
+  deleteProduct,
+  getStoredProducts,
+  normalizeProductCategory,
+  seedDefaultProductsIfEmpty,
+  saveProduct,
+  saveProducts,
+  subscribeToProducts,
+  type StoredProduct,
+} from '@/lib/products-storage'
+import {
+  getCurrentProductAdmin,
+  hasProductAdminAccess,
+  signInProductAdmin,
+  signOutProductAdmin,
+  supabase,
+} from '@/lib/supabase'
 
 type ProductRow = StoredProduct
 
-const emptyForm = { name: '', category: 'Phone Cases', price: '', stock: '10', image: '', description: '', sizes: '', colors: '' }
+const getErrorMessage = (error: unknown) =>
+  typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+    ? error.message
+    : error instanceof Error
+      ? error.message
+      : String(error)
+
+const emptyForm = { name: '', category: 'Phone Cases', price: '', originalPrice: '', stock: '10', image: '', galleryImages: '', description: '', details: '', materials: '', sizes: '', colors: '', rating: '', reviewCount: '' }
+const readImageFile = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => typeof reader.result === 'string'
+    ? resolve(reader.result)
+    : reject(new Error(`تعذر قراءة الصورة ${file.name}.`))
+  reader.onerror = () => reject(reader.error ?? new Error(`تعذر قراءة الصورة ${file.name}.`))
+  reader.readAsDataURL(file)
+})
 
 export const Route = createFileRoute('/admin')({
   component: AdminDashboardRoute,
@@ -18,51 +47,124 @@ export const Route = createFileRoute('/admin')({
 function AdminDashboardRoute() {
   const [authReady, setAuthReady] = useState(false)
   const [isAuthed, setIsAuthed] = useState(false)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingGalleryImages, setUploadingGalleryImages] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [galleryImagePreviews, setGalleryImagePreviews] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [items, setItems] = useState<ProductRow[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [seeding, setSeeding] = useState(false)
 
   useEffect(() => {
-    try { setIsAuthed(localStorage.getItem(ADMIN_AUTH_KEY) === 'true') } catch { setIsAuthed(false) }
-    setAuthReady(true)
+    let mounted = true
+    const checkAccess = (userId: string | undefined) => {
+      if (!userId) {
+        if (mounted) {
+          setIsAuthed(false)
+          setAuthReady(true)
+        }
+        return
+      }
+      void hasProductAdminAccess(userId)
+        .then(hasAccess => {
+          if (mounted) {
+            setIsAuthed(hasAccess)
+            setAuthReady(true)
+          }
+        })
+        .catch(error => {
+          console.error('Failed to verify product admin access', error)
+          if (mounted) {
+            setIsAuthed(false)
+            setAuthReady(true)
+          }
+        })
+    }
+
+    void getCurrentProductAdmin()
+      .then(hasAccess => {
+        if (mounted) {
+          setIsAuthed(hasAccess)
+          setAuthReady(true)
+        }
+      })
+      .catch(error => {
+        console.error('Failed to restore product admin session', error)
+        if (mounted) {
+          setIsAuthed(false)
+          setAuthReady(true)
+        }
+      })
+    const { data: authListener } = supabase?.auth.onAuthStateChange((_event, session) => {
+        window.setTimeout(() => checkAccess(session?.user.id), 0)
+    }) ?? { data: { subscription: null } }
+
+    return () => {
+      mounted = false
+      authListener.subscription?.unsubscribe()
+    }
   }, [])
 
-  const loadProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async () => {
     setListLoading(true)
     try {
-      const rows = loadStoredProducts()
+      const rows = await getStoredProducts()
       const sorted = [...rows].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
       setItems(sorted)
+      return sorted
     } catch (error) {
-      toast.error('ما قدرناش نجيبو المنتجات', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
+      console.error('Failed to fetch admin products from Supabase:', error)
+      throw error
     } finally {
       setListLoading(false)
     }
   }, [])
 
-  useEffect(() => { if (isAuthed) void loadProducts() }, [isAuthed, loadProducts])
+  const loadProducts = useCallback(async () => {
+    try {
+      await fetchProducts()
+    } catch (error) {
+      console.error('Failed to fetch admin products from Supabase:', error)
+      toast.error('ما قدرناش نجيبو المنتجات', { description: getErrorMessage(error) })
+    }
+  }, [fetchProducts])
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!isAuthed) return
+    void (async () => {
+      await seedDefaultProductsIfEmpty()
+      await loadProducts()
+    })().catch(error => {
+      console.error('Failed to initialize admin products:', error)
+      toast.error('ما قدرناش نجهزو المنتجات', { description: getErrorMessage(error) })
+    })
+    return subscribeToProducts(() => { void loadProducts() })
+  }, [isAuthed, loadProducts])
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === ADMIN_PASSWORD) {
-      try { localStorage.setItem(ADMIN_AUTH_KEY, 'true') } catch { /* localStorage may be unavailable */ }
+    try {
+      await signInProductAdmin(email.trim(), password)
       setIsAuthed(true)
+      setEmail('')
       setPassword('')
       toast.success('مرحبا بك فلوحة الإدارة.')
-    } else {
-      toast.error('كلمة المرور غير صحيحة.')
-      setPassword('')
+    } catch (error) {
+      toast.error('تعذر تسجيل الدخول', { description: error instanceof Error ? error.message : 'تحقق من بيانات الدخول وحاول مرة أخرى.' })
     }
   }
 
-  const handleLogout = () => {
-    try { localStorage.removeItem(ADMIN_AUTH_KEY) } catch { /* ignore */ }
-    setIsAuthed(false)
+  const handleLogout = async () => {
+    try {
+      await signOutProductAdmin()
+      setIsAuthed(false)
+    } catch (error) {
+      toast.error('تعذر تسجيل الخروج', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
+    }
   }
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,14 +182,7 @@ function AdminDashboardRoute() {
     }
     setUploadingImage(true)
     try {
-      const image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => typeof reader.result === 'string'
-          ? resolve(reader.result)
-          : reject(new Error('تعذر قراءة ملف الصورة.'))
-        reader.onerror = () => reject(reader.error ?? new Error('تعذر قراءة ملف الصورة.'))
-        reader.readAsDataURL(file)
-      })
+      const image = await readImageFile(file)
       setForm(current => ({ ...current, image }))
       toast.success('وجدات الصورة للحفظ محلياً.')
     } catch (error) {
@@ -97,17 +192,52 @@ function AdminDashboardRoute() {
     }
   }
 
+  const handleGalleryImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files ?? [])
+    event.currentTarget.value = ''
+    if (files.length === 0) return
+
+    const invalidFile = files.find(file => !file.type.startsWith('image/'))
+    if (invalidFile) {
+      toast.error(`الملف "${invalidFile.name}" ماشي صورة.`)
+      return
+    }
+    const oversizedFile = files.find(file => file.size > 3 * 1024 * 1024)
+    if (oversizedFile) {
+      toast.error(`الصورة "${oversizedFile.name}" كبيرة؛ اختار صور أقل من 3 MB لكل صورة.`)
+      return
+    }
+
+    setUploadingGalleryImages(true)
+    try {
+      const images = await Promise.all(files.map(readImageFile))
+      setGalleryImagePreviews(current => [...new Set([...current, ...images])])
+      toast.success(`وجدات ${images.length} صور للمعرض.`)
+    } catch (error) {
+      toast.error('ما قدرناش نقراو صور المعرض', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
+    } finally {
+      setUploadingGalleryImages(false)
+    }
+  }
+
   const startEdit = (row: ProductRow) => {
     setEditingId(row.id)
+    setGalleryImagePreviews(row.galleryImages ?? [])
     setForm({
       name: row.name ?? '',
       category: row.category ?? 'Phone Cases',
       price: String(row.price ?? ''),
+      originalPrice: row.originalPrice != null ? String(row.originalPrice) : '',
       stock: String(row.stock ?? 10),
       image: row.image ?? '',
+      galleryImages: '',
       description: row.description ?? '',
+      details: row.details ?? '',
+      materials: row.materials ?? '',
       sizes: row.sizes?.join(', ') ?? '',
       colors: row.colors?.join(', ') ?? '',
+      rating: row.rating != null ? String(row.rating) : '',
+      reviewCount: row.reviewCount != null ? String(row.reviewCount) : '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -115,6 +245,7 @@ function AdminDashboardRoute() {
   const cancelEdit = () => {
     setEditingId(null)
     setForm(emptyForm)
+    setGalleryImagePreviews([])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,30 +264,58 @@ function AdminDashboardRoute() {
       toast.error('دخل المقاسات والألوان المتوفرة للملابس.')
       return
     }
+    const originalPrice = form.originalPrice ? Number(form.originalPrice) : undefined
+    const rating = form.rating ? Number(form.rating) : undefined
+    const reviewCount = form.reviewCount ? Number(form.reviewCount) : undefined
+    if (originalPrice !== undefined && (!Number.isFinite(originalPrice) || originalPrice <= Number(form.price))) {
+      toast.error('الثمن قبل التخفيض خاصو يكون أكبر من الثمن الحالي.')
+      return
+    }
+    if (rating !== undefined && (!Number.isFinite(rating) || rating < 0 || rating > 5)) {
+      toast.error('التقييم خاصو يكون بين 0 و5.')
+      return
+    }
+    if (reviewCount !== undefined && (!Number.isInteger(reviewCount) || reviewCount < 0)) {
+      toast.error('عدد التقييمات خاصو يكون عدداً صحيحاً موجباً.')
+      return
+    }
     setLoading(true)
+    const galleryUrls = form.galleryImages.split(/\r?\n/).map(image => image.trim()).filter(Boolean)
+    const galleryImages = [...new Set([...galleryImagePreviews, ...galleryUrls])]
     const data = {
       name: form.name.trim(),
       category: form.category,
       price: Number(form.price),
+      originalPrice,
       stock: Number.parseInt(form.stock || '10', 10),
       image: form.image,
+      galleryImages,
       description: form.description.trim(),
+      details: form.details.trim(),
+      materials: form.materials.trim(),
+      rating,
+      reviewCount,
       sizes: form.category === 'Clothing' ? sizes : undefined,
       colors: form.category === 'Clothing' ? colors : undefined,
     }
     try {
-      const rows = loadStoredProducts()
+      const rows = await getStoredProducts()
       if (editingId) {
-        saveStoredProducts(rows.map(row => row.id === editingId ? { ...row, ...data } : row))
-        toast.success('تم تعديل المنتج بنجاح!')
+        const existing = rows.find(row => row.id === editingId)
+        if (!existing) throw new Error('المنتج المراد تعديله غير موجود.')
+        await saveProduct({ ...existing, ...data })
       } else {
-        saveStoredProducts([...rows, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...data }])
-        toast.success('تم نشر المنتج بنجاح!', { description: 'غادي يبان فالمتجر مباشرة.' })
+        await saveProduct({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...data })
       }
+      await fetchProducts()
       cancelEdit()
-      await loadProducts()
+      toast.success(
+        editingId ? 'تم تعديل المنتج بنجاح!' : 'تم نشر المنتج بنجاح!',
+        editingId ? undefined : { description: 'غادي يبان فالمتجر مباشرة.' },
+      )
     } catch (error) {
-      toast.error('حدث خطأ أثناء حفظ المنتج', { description: error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى.' })
+      console.error('Failed to save product in Supabase:', error)
+      toast.error('تعذر حفظ المنتج أو تأكيد ظهوره من قاعدة البيانات', { description: getErrorMessage(error) })
     } finally {
       setLoading(false)
     }
@@ -165,33 +324,31 @@ function AdminDashboardRoute() {
   const handleDelete = async (row: ProductRow) => {
     if (!window.confirm(`واش متأكد بغيتي تمسح "${row.name}"؟ ما يمكنش ترجع.`)) return
     try {
-      saveStoredProducts(loadStoredProducts().filter(product => product.id !== row.id))
-      toast.success('تمسح المنتج.')
+      await deleteProduct(row.id)
       if (editingId === row.id) cancelEdit()
-      await loadProducts()
+      await fetchProducts()
+      toast.success('تمسح المنتج.')
     } catch (error) {
-      toast.error('ما قدرناش نمسحو المنتج', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
+      console.error('Failed to delete product in Supabase:', error)
+      toast.error('ما قدرناش نمسحو المنتج', { description: getErrorMessage(error) })
     }
   }
 
   const importDemoProducts = async () => {
-    if (!window.confirm(`غادي نضيفو ${DEFAULT_PRODUCTS.length} منتجات تجريبية للتخزين المحلي باش تقدر تعدلهم وتمسحهم. نكملو؟`)) return
+    if (!window.confirm(`غادي نضيفو ${DEFAULT_PRODUCTS.length} منتجات تجريبية لقاعدة البيانات ونحدّثو الموجود منها. نكملو؟`)) return
     setSeeding(true)
     try {
-      const rows = loadStoredProducts()
-      const existing = new Set(rows.map(item => item.name))
-      const addedProducts: ProductRow[] = []
-      let added = 0
-      for (const product of DEFAULT_PRODUCTS) {
-        if (existing.has(product.name)) continue
-        addedProducts.push({ ...product, id: crypto.randomUUID(), createdAt: new Date().toISOString() })
-        added += 1
-      }
-      saveStoredProducts([...rows, ...addedProducts])
-      toast.success(added > 0 ? `تزادو ${added} منتجات.` : 'المنتجات التجريبية موجودة من قبل.')
-      await loadProducts()
+      const demoProducts = DEFAULT_PRODUCTS.map(product => ({
+        ...product,
+        category: normalizeProductCategory(product.category ?? 'Accessories'),
+        createdAt: product.createdAt ?? new Date().toISOString(),
+      }))
+      await saveProducts(demoProducts)
+      await fetchProducts()
+      toast.success(`تستوردو ${demoProducts.length} منتجات تجريبية.`)
     } catch (error) {
-      toast.error('وقع مشكل فالاستيراد', { description: error instanceof Error ? error.message : 'عاود المحاولة.' })
+      console.error('Failed to import demo products into Supabase:', error)
+      toast.error('وقع مشكل فالاستيراد', { description: getErrorMessage(error) })
     } finally {
       setSeeding(false)
     }
@@ -208,20 +365,30 @@ function AdminDashboardRoute() {
           <form onSubmit={handleLogin} className="w-full max-w-sm rounded-3xl border border-border/80 bg-background p-7 shadow-xl sm:p-9">
             <span className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-foreground"><Lock size={24}/></span>
             <h1 className="text-center text-xl font-bold">دخول الإدارة</h1>
-            <p className="mt-2 text-center text-sm text-muted-foreground">دخل كلمة المرور باش تسيّر المنتجات.</p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">سجل الدخول بحساب الإدارة ديالك باش تسيّر المنتجات.</p>
             <label className="mt-6 block">
+              <span className="mb-2 block text-xs font-bold text-muted-foreground">البريد الإلكتروني</span>
+              <input
+                type="email"
+                dir="ltr"
+                autoComplete="username"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+            <label className="mt-4 block">
               <span className="mb-2 block text-xs font-bold text-muted-foreground">كلمة المرور</span>
               <input
                 type="password"
                 dir="ltr"
-                autoFocus
                 autoComplete="current-password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </label>
-            <button type="submit" disabled={!password} className="mt-5 h-12 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95 disabled:opacity-60">
+            <button type="submit" disabled={!email || !password} className="mt-5 h-12 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95 disabled:opacity-60">
               دخول
             </button>
             <a href="/" className="mt-4 block text-center text-xs font-semibold text-muted-foreground transition hover:text-foreground">العودة للمتجر</a>
@@ -294,6 +461,23 @@ function AdminDashboardRoute() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">الثمن قبل التخفيض (اختياري)</span>
+                  <input type="number" min="0" value={form.originalPrice} onChange={e => setForm({ ...form, originalPrice: e.target.value })} placeholder="مثال: 599" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">التقييم / 5</span>
+                    <input type="number" min="0" max="5" step="0.1" value={form.rating} onChange={e => setForm({ ...form, rating: e.target.value })} placeholder="4.8" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">عدد التقييمات</span>
+                    <input type="number" min="0" step="1" value={form.reviewCount} onChange={e => setForm({ ...form, reviewCount: e.target.value })} placeholder="24" className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">صورة المنتج</label>
                 <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} className="w-full rounded-xl border border-input bg-background p-3 text-sm file:ml-3 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground" />
@@ -308,12 +492,59 @@ function AdminDashboardRoute() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">وصف المنتج (Description)</label>
-                <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="اكتب وصفاً مختصراً ومحفزاً للمنتج..." className="w-full rounded-xl border border-input bg-background p-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"></textarea>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">رفع صور إضافية للمعرض</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleGalleryImagesUpload}
+                  disabled={uploadingGalleryImages}
+                  className="w-full rounded-xl border border-input bg-background p-3 text-sm file:ml-3 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground"
+                />
+                <p className="mt-2 text-[11px] text-muted-foreground">اختار عدة صور من جهازك (حتى 3 MB لكل صورة). كتتحفظ محلياً فهاد المتصفح.</p>
+                {uploadingGalleryImages && <p className="mt-2 text-xs text-primary">جاري تجهيز صور المعرض...</p>}
+                {galleryImagePreviews.length > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
+                    {galleryImagePreviews.map((image, index) => (
+                      <div key={`${index}-${image.slice(0, 48)}`} className="relative aspect-square overflow-hidden rounded-xl border border-border bg-secondary">
+                        <img src={image} alt={`معاينة صورة المعرض ${index + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setGalleryImagePreviews(current => current.filter((_, imageIndex) => imageIndex !== index))}
+                          aria-label={`حذف صورة المعرض ${index + 1}`}
+                          title="حذف الصورة"
+                          className="absolute left-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-background/90 text-foreground shadow transition hover:bg-destructive hover:text-white"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="mt-5 block">
+                  <span className="mb-2 block text-xs font-bold text-muted-foreground">أو أضف روابط الصور (اختياري، رابط بكل سطر)</span>
+                  <textarea rows={3} value={form.galleryImages} onChange={e => setForm({ ...form, galleryImages: e.target.value })} placeholder={'https://example.com/product-side.jpg\nhttps://example.com/product-detail.jpg'} className="w-full resize-none rounded-xl border border-input bg-background p-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"></textarea>
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground">تظهر الصور كصور مصغرة بجانب الصورة الرئيسية.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">الوصف المختصر</span>
+                  <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="وصف مختصر للمنتج..." className="w-full resize-none rounded-xl border border-input bg-background p-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"></textarea>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">التفاصيل والمواد</span>
+                  <textarea rows={3} value={form.details} onChange={e => setForm({ ...form, details: e.target.value })} placeholder="تفاصيل إضافية عن المنتج..." className="w-full resize-none rounded-xl border border-input bg-background p-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"></textarea>
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">المواد</span>
+                  <input value={form.materials} onChange={e => setForm({ ...form, materials: e.target.value })} placeholder="مثال: جلد طبيعي، ستانلس ستيل..." className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                </label>
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={loading || uploadingImage} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-65 shadow-md cursor-pointer">
+                <button type="submit" disabled={loading || uploadingImage || uploadingGalleryImages} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-xs font-semibold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-65 shadow-md cursor-pointer">
                   {loading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
