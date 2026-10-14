@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { OptimizedImage } from '@/components/OptimizedImage'
 import {
   DEFAULT_PRODUCTS,
   deleteProduct,
@@ -483,7 +484,7 @@ function AdminDashboardRoute() {
                 <input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage} className="w-full rounded-xl border border-input bg-background p-3 text-sm file:ml-3 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground" />
                 <p className="mt-2 text-[11px] text-muted-foreground">اختار صورة من جهازك (حتى 3 MB). كتتحفظ محلياً فهاد المتصفح.</p>
                 {uploadingImage && <p className="mt-2 text-xs text-primary">جاري رفع الصورة...</p>}
-                {form.image && <div className="mt-3 flex items-center gap-3 rounded-xl border border-border p-2"><img src={form.image} alt="معاينة صورة المنتج" className="h-16 w-16 rounded-lg object-cover"/><span className="text-xs text-muted-foreground">الصورة جاهزة</span></div>}
+                {form.image && <div className="mt-3 flex items-center gap-3 rounded-xl border border-border p-2"><OptimizedImage src={form.image} alt="معاينة صورة المنتج" width={160} loading="eager" className="h-16 w-16 shrink-0 rounded-lg"/><span className="text-xs text-muted-foreground">الصورة جاهزة</span></div>}
               </div>
 
               <div>
@@ -507,7 +508,7 @@ function AdminDashboardRoute() {
                   <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
                     {galleryImagePreviews.map((image, index) => (
                       <div key={`${index}-${image.slice(0, 48)}`} className="relative aspect-square overflow-hidden rounded-xl border border-border bg-secondary">
-                        <img src={image} alt={`معاينة صورة المعرض ${index + 1}`} className="h-full w-full object-cover" />
+                        <OptimizedImage src={image} alt={`معاينة صورة المعرض ${index + 1}`} width={160} className="absolute inset-0" />
                         <button
                           type="button"
                           onClick={() => setGalleryImagePreviews(current => current.filter((_, imageIndex) => imageIndex !== index))}
@@ -582,7 +583,7 @@ function AdminDashboardRoute() {
               <ul className="space-y-3">
                 {items.map(row => (
                   <li key={row.id} className={`flex items-center gap-3 rounded-2xl border p-3 transition ${editingId === row.id ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                    <img src={row.image} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover bg-secondary" />
+                    <OptimizedImage src={row.image} alt="" width={160} className="h-16 w-16 shrink-0 rounded-xl bg-secondary" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">{row.name}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">{row.category} · {Number(row.price).toLocaleString('fr-MA')} DH · المخزون: {row.stock ?? '-'}</p>

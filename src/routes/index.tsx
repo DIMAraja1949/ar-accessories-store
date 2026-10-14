@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Plus, Search, ShieldCheck, ShoppingBag, Truck, Watch, X, Zap, Eye, ArrowUpDown, Check, Tag, Sparkles, MessageCircle, FileText, RotateCcw, Globe, Star } from 'lucide-react'
 import { toast } from 'sonner'
+import { OptimizedImage } from '@/components/OptimizedImage'
 import {
   getStoredProducts,
   normalizeProductCategory,
@@ -727,7 +728,15 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
           </div>
         </div>
         <div className="group relative order-1 min-h-75 overflow-hidden rounded-[1.4rem] bg-secondary shadow-lg sm:min-h-107.5 lg:order-2 lg:min-h-130">
-          <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1600&q=90" alt="Luxury jewellery and lifestyle accessories" className="absolute inset-0 h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.01]"/>
+          <OptimizedImage
+            src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=1200&q=85"
+            alt="Luxury jewellery and lifestyle accessories"
+            loading="eager"
+            fetchPriority="high"
+            width={1200}
+            className="absolute inset-0"
+            imageClassName="transition-transform duration-200 group-hover:scale-[1.01]"
+          />
           <div className="absolute inset-0 bg-linear-to-t from-primary/70 via-primary/5 to-transparent"/>
           <span className={`absolute top-5 rounded-full border border-white/35 bg-primary/75 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-white ${lang === 'ar' ? 'left-5' : 'right-5'}`}>Maroc Shipping</span>
           <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between text-white sm:bottom-8 sm:left-8 sm:right-8">
@@ -831,7 +840,15 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                     className="relative aspect-[0.91] cursor-pointer overflow-hidden bg-secondary"
                     title="Click to view product details"
                   >
-                    <img src={product.image} alt={lang === 'ar' ? product.name : product.nameEn} loading={index > 3 ? 'lazy' : 'eager'} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"/>
+                    <OptimizedImage
+                      src={product.image}
+                      alt={lang === 'ar' ? product.name : product.nameEn}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
+                      width={600}
+                      className="absolute inset-0"
+                      imageClassName="transition-transform duration-200 group-hover:scale-[1.02]"
+                    />
                     <span className={`absolute top-3 rounded-full border border-white/20 bg-zinc-950/65 px-2.5 py-1 text-[8px] font-bold tracking-[0.12em] text-white shadow ${lang === 'ar' ? 'left-3' : 'right-3'}`}>{(product.tag || product.tagEn) ? (lang === 'ar' ? product.tag : product.tagEn) : categoryLabel(product.category)}</span>
 
                     <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-center justify-center">
@@ -884,12 +901,26 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                   <div className="flex max-h-[55vh] w-14 shrink-0 flex-col gap-2 overflow-x-hidden overflow-y-auto py-1 sm:w-18 sm:gap-3">
                     {galleryImages.map((image, index) => (
                       <button key={`${image}-${index}`} type="button" onClick={() => setSelectedImageIndex(index)} aria-label={`${lang === 'ar' ? 'عرض الصورة' : 'Show image'} ${index + 1}`} aria-pressed={selectedImageIndex === index} className={`aspect-square w-full overflow-hidden rounded-lg border-2 bg-background transition-all duration-300 ${selectedImageIndex === index ? 'border-primary shadow-md ring-2 ring-primary/15' : 'border-transparent opacity-70 hover:border-border hover:opacity-100'}`}>
-                        <img src={image} alt="" className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"/>
+                        <OptimizedImage
+                          src={image}
+                          alt=""
+                          width={160}
+                          className="h-full w-full"
+                          imageClassName="transition-transform duration-500 hover:scale-105"
+                        />
                       </button>
                     ))}
                   </div>
                   <div className="group relative h-[min(55vh,440px)] min-h-60 min-w-0 flex-1 overflow-hidden rounded-xl bg-secondary sm:min-h-80">
-                    <img key={activeImage} src={activeImage} alt={lang === 'ar' ? selectedProduct.name : selectedProduct.nameEn} className="h-full min-h-60 w-full object-cover transition-transform duration-150 group-hover:scale-[1.01] sm:min-h-80"/>
+                    <OptimizedImage
+                      src={activeImage}
+                      alt={lang === 'ar' ? selectedProduct.name : selectedProduct.nameEn}
+                      loading="eager"
+                      fetchPriority="high"
+                      width={1200}
+                      className="absolute inset-0"
+                      imageClassName="transition-transform duration-150 group-hover:scale-[1.01]"
+                    />
                     {(selectedProduct.tag || selectedProduct.tagEn) && <span dir={lang === 'ar' ? 'rtl' : 'ltr'} className="absolute left-4 top-4 rounded-full bg-background px-3 py-1.5 text-[10px] font-bold tracking-wide text-primary shadow-sm">{lang === 'ar' ? selectedProduct.tag : selectedProduct.tagEn}</span>}
                   </div>
                 </div>
@@ -970,7 +1001,14 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                   {quickViewTab === 'details' && (
                     <>
                       <p className="text-sm leading-7 text-muted-foreground">{fullDetails || (lang === 'ar' ? 'تفاصيل هذا المنتج ستتوفر قريباً.' : 'More product details will be available soon.')}</p>
-                      {galleryImages.length > 1 && <img src={galleryImages[galleryImages.length - 1]} alt={lang === 'ar' ? `تفاصيل ${selectedProduct.name}` : `${selectedProduct.nameEn} detail`} className="max-h-56 w-full rounded-xl bg-secondary object-cover"/>}
+                      {galleryImages.length > 1 && (
+                        <OptimizedImage
+                          src={galleryImages[galleryImages.length - 1]}
+                          alt={lang === 'ar' ? `تفاصيل ${selectedProduct.name}` : `${selectedProduct.nameEn} detail`}
+                          width={600}
+                          className="aspect-[4/3] max-h-56 w-full rounded-xl"
+                        />
+                      )}
                     </>
                   )}
                   {quickViewTab === 'materials' && <p className="text-sm leading-7 text-muted-foreground">{selectedProduct.materials || (lang === 'ar' ? 'لم تتم إضافة معلومات المواد لهذا المنتج بعد.' : 'Material information has not been added for this product yet.')}</p>}
@@ -1129,7 +1167,12 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                 <div className="flex-1 space-y-4 overflow-y-auto p-5">
                   {cart.map(item => (
                     <div key={item.lineKey} className="flex gap-4 border-b border-border pb-4">
-                      <img src={item.product.image} alt="" className="h-24 w-20 rounded-xl object-cover"/>
+                      <OptimizedImage
+                        src={item.product.image}
+                        alt=""
+                        width={160}
+                        className="h-24 w-20 shrink-0 rounded-xl"
+                      />
                       <div className="flex min-w-0 flex-1 flex-col">
                         <p className="text-sm font-semibold">{lang === 'ar' ? item.product.name : item.product.nameEn}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatPrice(item.product.price)}</p>

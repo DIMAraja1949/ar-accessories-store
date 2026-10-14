@@ -106,6 +106,55 @@ body {
   color: var(--foreground);
 }
 
+.optimized-image {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background-color: var(--secondary);
+}
+
+.optimized-image.absolute {
+  position: absolute;
+}
+
+.optimized-image__skeleton {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    var(--secondary) 25%,
+    color-mix(in srgb, var(--muted) 72%, white) 45%,
+    var(--secondary) 65%
+  );
+  background-size: 220% 100%;
+  animation: image-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.optimized-image__img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.optimized-image__img--loaded {
+  opacity: 1;
+}
+
+.optimized-image--failed .optimized-image__skeleton {
+  animation: none;
+  background: var(--secondary);
+}
+
+@keyframes image-skeleton-shimmer {
+  to { background-position: -220% 0; }
+}
+
 .announcement-bar {
   position: relative;
   z-index: 40;
@@ -231,5 +280,13 @@ select {
 
   .announcement-bar__message:first-child {
     opacity: 1;
+  }
+
+  .optimized-image__skeleton {
+    animation: none;
+  }
+
+  .optimized-image__img {
+    transition: none;
   }
 }
