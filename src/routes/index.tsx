@@ -147,6 +147,7 @@ function Storefront({
     initialLoadError ? 'loading' : 'ready',
   )
   const productFetchRequest = useRef(0)
+  const productRefreshTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const storefrontMounted = useRef(false)
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
@@ -206,17 +207,31 @@ function Storefront({
     }
   }, [])
 
+  const scheduleStoreProductRefresh = useCallback(() => {
+    if (productRefreshTimeout.current !== null) {
+      window.clearTimeout(productRefreshTimeout.current)
+    }
+    productRefreshTimeout.current = window.setTimeout(() => {
+      productRefreshTimeout.current = null
+      void refreshStoreProducts()
+    }, 75)
+  }, [refreshStoreProducts])
+
   // Product store notifications refresh the listing and any open Quick View.
   useEffect(() => {
     storefrontMounted.current = true
     void refreshStoreProducts()
-    const unsubscribe = subscribeToProducts(() => { void refreshStoreProducts() })
+    const unsubscribe = subscribeToProducts(scheduleStoreProductRefresh)
     return () => {
       storefrontMounted.current = false
       productFetchRequest.current += 1
+      if (productRefreshTimeout.current !== null) {
+        window.clearTimeout(productRefreshTimeout.current)
+        productRefreshTimeout.current = null
+      }
       unsubscribe()
     }
-  }, [refreshStoreProducts])
+  }, [refreshStoreProducts, scheduleStoreProductRefresh])
 
   // Remove cart lines whose product no longer exists (only after a successful load)
   useEffect(() => {

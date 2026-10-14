@@ -555,7 +555,7 @@ export async function saveProducts(products: StoredProduct[]): Promise<void> {
       .upsert(products.map(product => sanitizeProductForSupabase(normalizeProduct(product))), { onConflict: 'id' })
     if (error) throw error
   } catch (error) {
-    console.log('saveProducts Supabase bulk save error:', error)
+    console.error('saveProducts Supabase bulk save error:', error)
     throw error
   }
   publishProductChange({ type: 'replace' })

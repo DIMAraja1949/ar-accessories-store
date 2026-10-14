@@ -89,6 +89,24 @@ function RootDocument({ children }: { children: ReactNode }) {
       <body>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider delayDuration={0}>
+            <aside
+              className="announcement-bar"
+              dir="rtl"
+              lang="ar"
+              aria-label="إعلانات المتجر"
+            >
+              <div className="announcement-bar__messages">
+                <p className="announcement-bar__message">
+                  📦 توصيل مجاني لكافة مدن المغرب
+                </p>
+                <p className="announcement-bar__message">
+                  💎 جودة أصلية ومضمونة 100%
+                </p>
+                <p className="announcement-bar__message">
+                  🔥 عروض حصرية لفترة محدودة
+                </p>
+              </div>
+            </aside>
             <Toaster />
             {children}
           </TooltipProvider>
