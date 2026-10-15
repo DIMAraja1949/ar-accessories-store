@@ -4,6 +4,11 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+const allowedProductAdminEmail = 'chefabderrahim639@gmail.com'
+
+export function isAllowedProductAdminEmail(email: string | undefined): boolean {
+  return email?.trim().toLowerCase() === allowedProductAdminEmail
+}
 
 if (!isSupabaseConfigured) {
   console.warn(
@@ -21,7 +26,8 @@ export const supabase = isSupabaseConfigured
     })
   : null
 
-export async function hasProductAdminAccess(userId: string): Promise<boolean> {
+export async function hasProductAdminAccess(userId: string, email?: string): Promise<boolean> {
+  if (isAllowedProductAdminEmail(email)) return true
   if (!supabase) return false
   const { data, error } = await supabase
     .from('product_admins')
@@ -36,14 +42,16 @@ export async function getCurrentProductAdmin(): Promise<boolean> {
   if (!supabase) return false
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error
-  return data.session ? hasProductAdminAccess(data.session.user.id) : false
+  return data.session
+    ? hasProductAdminAccess(data.session.user.id, data.session.user.email)
+    : false
 }
 
 export async function signInProductAdmin(email: string, password: string): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured.')
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
-  if (!data.user || !(await hasProductAdminAccess(data.user.id))) {
+  if (!data.user || !(await hasProductAdminAccess(data.user.id, data.user.email))) {
     await supabase.auth.signOut()
     throw new Error('هذا الحساب غير مخول لإدارة المنتجات.')
   }

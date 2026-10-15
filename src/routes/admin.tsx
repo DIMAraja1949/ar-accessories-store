@@ -62,15 +62,15 @@ function AdminDashboardRoute() {
 
   useEffect(() => {
     let mounted = true
-    const checkAccess = (userId: string | undefined) => {
-      if (!userId) {
+    const checkAccess = (user: { id: string; email?: string } | undefined) => {
+      if (!user) {
         if (mounted) {
           setIsAuthed(false)
           setAuthReady(true)
         }
         return
       }
-      void hasProductAdminAccess(userId)
+      void hasProductAdminAccess(user.id, user.email)
         .then(hasAccess => {
           if (mounted) {
             setIsAuthed(hasAccess)
@@ -101,7 +101,7 @@ function AdminDashboardRoute() {
         }
       })
     const { data: authListener } = supabase?.auth.onAuthStateChange((_event, session) => {
-        window.setTimeout(() => checkAccess(session?.user.id), 0)
+        window.setTimeout(() => checkAccess(session?.user), 0)
     }) ?? { data: { subscription: null } }
 
     return () => {
