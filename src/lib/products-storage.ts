@@ -2,8 +2,13 @@ import { supabase } from '@/lib/supabase'
 
 export const PRODUCTS_STORAGE_KEY = 'ar-products'
 export const PRODUCTS_STORAGE_EVENT = 'ar-products-change'
+export const PRODUCTS_CACHE_KEY = 'ar-products-cache'
 export const STOREFRONT_PRODUCTS_QUERY_KEY = ['storefront-products'] as const
 const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
+const PRODUCT_PAGE_SIZE = 100
+const PRODUCT_FETCH_TIMEOUT_MS = 10000
+const PRODUCT_SELECT_COLUMNS =
+  'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
 const PRODUCT_CATEGORIES = [
   'Accessories',
   'Clothing',
@@ -378,16 +383,117 @@ function requireSupabase() {
   return supabase
 }
 
+function readCachedStoredProducts(): StoredProduct[] | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw =
+      localStorage.getItem(PRODUCTS_CACHE_KEY)
+      ?? localStorage.getItem('ar-storefront-products')
+    if (!raw) return null
+    const cache: unknown = JSON.parse(raw)
+    if (!cache || typeof cache !== 'object' || !('products' in cache)) {
+      console.warn('Ignoring invalid cached products.')
+      return null
+    }
+    const products = cache.products
+    if (
+      !Array.isArray(products)
+      || !products.every(product =>
+        product !== null
+        && typeof product === 'object'
+        && typeof product.id === 'string'
+        && typeof product.name === 'string'
+        && typeof product.image === 'string'
+        && Number.isFinite(Number(product.price)),
+      )
+    ) {
+      console.warn('Ignoring invalid cached products.')
+      return null
+    }
+    return products as StoredProduct[]
+  } catch (error) {
+    console.warn('Failed to read cached products:', error)
+    return null
+  }
+}
+
+function persistStoredProducts(products: StoredProduct[]): void {
+  if (typeof window === 'undefined') return
+
+  try {
+    localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify({
+      products,
+      updatedAt: Date.now(),
+    }))
+  } catch (error) {
+    console.warn('Failed to persist cached products:', error)
+  }
+}
+
+async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
+  const client = requireSupabase()
+  const products: StoredProduct[] = []
+
+  for (let offset = 0; ; offset += PRODUCT_PAGE_SIZE) {
+    const controller = new AbortController()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort()
+        reject(new Error(`Product query timed out after ${PRODUCT_FETCH_TIMEOUT_MS}ms.`))
+      }, PRODUCT_FETCH_TIMEOUT_MS)
+    })
+
+    try {
+      const page = await Promise.race([
+        client
+          .from('products')
+          .select(PRODUCT_SELECT_COLUMNS)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PRODUCT_PAGE_SIZE - 1)
+          .abortSignal(controller.signal),
+        timeout,
+      ])
+      if (page.error) throw page.error
+
+      const rows = (page.data ?? [])
+        .map((row, index) => fromSupabaseRow(row as Record<string, unknown>, offset + index))
+        .filter(product => product.id && product.name && product.image)
+      products.push(...rows)
+      if ((page.data ?? []).length < PRODUCT_PAGE_SIZE) return products
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }
+}
+
+async function getProductsWithFallback(): Promise<StoredProduct[]> {
+  try {
+    const products = await fetchSupabaseProducts()
+    persistStoredProducts(products)
+    return products
+  } catch (error) {
+    const isStatementTimeout =
+      typeof error === 'object'
+      && error !== null
+      && 'message' in error
+      && typeof error.message === 'string'
+      && /timeout|timed out|canceling statement/i.test(error.message)
+    if (isStatementTimeout) {
+      console.warn('Supabase product query timed out; using cached products.')
+    } else {
+      console.error('Supabase product query failed; using cached products:', error)
+    }
+    const cachedProducts = readCachedStoredProducts()
+    if (cachedProducts) return cachedProducts
+    throw error
+  }
+}
+
 const supabaseProductStore: ProductStoreAdapter = {
   async getProducts() {
-    const { data, error } = await requireSupabase()
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return (data ?? [])
-      .map((row, index) => fromSupabaseRow(row as Record<string, unknown>, index))
-      .filter(product => product.id && product.name && product.image)
+    return getProductsWithFallback()
   },
   async createProduct(product) {
     const { error } = await requireSupabase()
@@ -507,19 +613,7 @@ export async function getProducts(): Promise<StoredProduct[]> {
 }
 
 export async function getStoredProducts(): Promise<StoredProduct[]> {
-  try {
-    const { data, error } = await requireSupabase()
-      .from('products')
-      .select('*')
-    if (error) throw error
-
-    return (data ?? []).map((row, index) =>
-      fromSupabaseRow(row as Record<string, unknown>, index),
-    )
-  } catch (error) {
-    console.error('getStoredProducts Supabase fetch failed:', error)
-    throw error
-  }
+  return productStoreAdapter.getProducts()
 }
 
 export async function saveProduct(product: StoredProduct): Promise<void> {
