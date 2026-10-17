@@ -1,17 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { ClientOnly, createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
+import { ArrowRight, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
 import {
-  DEFAULT_PRODUCTS,
+  deleteAllProducts,
   deleteProduct,
   getCachedProducts,
   getStoredProducts,
   normalizeProductCategory,
-  seedDefaultProductsIfEmpty,
   saveProduct,
-  saveProducts,
   subscribeToProducts,
   STOREFRONT_PRODUCTS_QUERY_KEY,
   type StoredProduct,
@@ -64,7 +62,7 @@ function AdminDashboardRoute() {
   const [cachedProductsAtMount] = useState(() => getCachedProducts())
   const [items, setItems] = useState<ProductRow[]>(() => cachedProductsAtMount ?? [])
   const [listLoading, setListLoading] = useState(() => cachedProductsAtMount === null)
-  const [seeding, setSeeding] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -140,15 +138,7 @@ function AdminDashboardRoute() {
 
   useEffect(() => {
     if (!isAuthed) return
-    const cachedProducts = getCachedProducts()
-    if (cachedProducts?.length) {
-      void loadProducts()
-    } else {
-      void loadProducts()
-      void seedDefaultProductsIfEmpty()
-        .catch(error => console.warn('Could not initialize default products:', error))
-        .then(loadProducts)
-    }
+    void loadProducts()
     return subscribeToProducts(() => {
       void queryClient.invalidateQueries({ queryKey: STOREFRONT_PRODUCTS_QUERY_KEY })
       void loadProducts()
@@ -317,9 +307,8 @@ function AdminDashboardRoute() {
       colors: form.category === 'Clothing' ? colors : undefined,
     }
     try {
-      const rows = await getStoredProducts()
       if (editingId) {
-        const existing = rows.find(row => row.id === editingId)
+        const existing = items.find(row => row.id === editingId)
         if (!existing) throw new Error('المنتج المراد تعديله غير موجود.')
         await saveProduct({ ...existing, ...data })
       } else {
@@ -352,23 +341,23 @@ function AdminDashboardRoute() {
     }
   }
 
-  const importDemoProducts = async () => {
-    if (!window.confirm(`غادي نضيفو ${DEFAULT_PRODUCTS.length} منتجات تجريبية لقاعدة البيانات ونحدّثو الموجود منها. نكملو؟`)) return
-    setSeeding(true)
+  const handleDeleteAll = async () => {
+    if (items.length === 0 || deletingAll) return
+    if (!window.confirm(`واش متأكد بغيتي تمسح جميع المنتجات (${items.length})؟ ما يمكنش ترجع.`)) return
+
+    setDeletingAll(true)
+    setItems([])
+    if (editingId) cancelEdit()
     try {
-      const demoProducts = DEFAULT_PRODUCTS.map(product => ({
-        ...product,
-        category: normalizeProductCategory(product.category ?? 'Accessories'),
-        createdAt: product.createdAt ?? new Date().toISOString(),
-      }))
-      await saveProducts(demoProducts)
-      await fetchProducts()
-      toast.success(`تستوردو ${demoProducts.length} منتجات تجريبية.`)
+      await deleteAllProducts()
+      toast.success('تم مسح جميع المنتجات.')
     } catch (error) {
-      console.error('Failed to import demo products into Supabase:', error)
-      toast.error('وقع مشكل فالاستيراد', { description: getErrorMessage(error) })
+      console.error('Failed to delete all products:', error)
+      toast.error('تم إفراغ اللائحة المحلية، لكن تعذر مسح جميع المنتجات من قاعدة البيانات.', {
+        description: getErrorMessage(error),
+      })
     } finally {
-      setSeeding(false)
+      setDeletingAll(false)
     }
   }
 
@@ -594,8 +583,8 @@ function AdminDashboardRoute() {
                 <h2 className="text-lg font-bold">المنتجات الحالية ({items.length})</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">من هنا تقدر تعدّل ولا تمسح أي منتج.</p>
               </div>
-              <button type="button" onClick={importDemoProducts} disabled={seeding} className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-[11px] font-semibold transition hover:border-primary active:scale-95 disabled:opacity-60">
-                <Download size={13} /> {seeding ? 'جاري الاستيراد...' : 'استيراد المنتجات التجريبية'}
+              <button type="button" onClick={handleDeleteAll} disabled={items.length === 0 || deletingAll} className="flex items-center gap-1.5 rounded-full border border-red-200 px-4 py-2 text-[11px] font-semibold text-red-600 transition hover:border-red-500 hover:bg-red-50 active:scale-95 disabled:opacity-50">
+                <Trash2 size={13} /> {deletingAll ? 'جاري مسح الكل...' : 'مسح جميع المنتجات'}
               </button>
             </div>
 

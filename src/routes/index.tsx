@@ -4,7 +4,7 @@ import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Pl
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
 import {
-  DEFAULT_PRODUCTS,
+  getCachedProducts,
   getStoredProducts,
   normalizeProductCategory,
   STOREFRONT_PRODUCTS_QUERY_KEY,
@@ -64,48 +64,6 @@ const STOREFRONT_PRODUCTS_CACHE_KEY = 'ar-storefront-products'
 const PRODUCT_STALE_TIME = 1000 * 60 * 5
 const PRODUCT_GC_TIME = 1000 * 60 * 30
 
-function isCachedProduct(value: unknown): value is Product {
-  if (!value || typeof value !== 'object') return false
-  const product = value as Record<string, unknown>
-  return typeof product.id === 'string'
-    && typeof product.name === 'string'
-    && typeof product.nameEn === 'string'
-    && typeof product.category === 'string'
-    && typeof product.image === 'string'
-    && typeof product.description === 'string'
-    && typeof product.descriptionEn === 'string'
-    && typeof product.price === 'number'
-    && Number.isFinite(product.price)
-}
-
-function readCachedProducts(): { products: Product[]; updatedAt: number } | null {
-  if (typeof window === 'undefined') return null
-
-  try {
-    const raw = localStorage.getItem(STOREFRONT_PRODUCTS_CACHE_KEY)
-    if (!raw) return null
-    const cached: unknown = JSON.parse(raw)
-    if (!cached || typeof cached !== 'object') {
-      console.warn('Ignoring invalid persisted storefront product cache.')
-      return null
-    }
-    const record = cached as { products?: unknown; updatedAt?: unknown }
-    if (
-      !Array.isArray(record.products)
-      || !record.products.every(isCachedProduct)
-      || typeof record.updatedAt !== 'number'
-      || !Number.isFinite(record.updatedAt)
-    ) {
-      console.warn('Ignoring invalid persisted storefront product cache.')
-      return null
-    }
-    return { products: record.products, updatedAt: record.updatedAt }
-  } catch (error) {
-    console.warn('Failed to read persisted storefront products:', error)
-    return null
-  }
-}
-
 async function fetchStorefrontProducts(): Promise<Product[]> {
   const products = mapStoredProducts(await getStoredProducts())
   if (typeof window !== 'undefined') {
@@ -132,37 +90,18 @@ function storefrontProductQueryOptions() {
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const persistedProducts = readCachedProducts()
-    if (
-      persistedProducts?.products.length
-      && !queryClient.getQueryData(STOREFRONT_PRODUCTS_QUERY_KEY)
-    ) {
-      queryClient.setQueryData(
-        STOREFRONT_PRODUCTS_QUERY_KEY,
-        persistedProducts.products,
-        { updatedAt: persistedProducts.updatedAt },
-      )
-    }
-
-    const cachedProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
-    if (cachedProducts?.length) {
+    const queryProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
+    const cachedProducts = queryProducts ?? mapStoredProducts(getCachedProducts() ?? [])
+    if (cachedProducts.length > 0) {
+      if (!queryProducts) {
+        queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, cachedProducts, {
+          updatedAt: 0,
+        })
+      }
       void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
         console.error('Failed to revalidate cached storefront products:', error)
       })
       return { products: cachedProducts, loadError: false }
-    }
-
-    if (cachedProducts) {
-      const products = mapStoredProducts(DEFAULT_PRODUCTS)
-      queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, products)
-      void queryClient.invalidateQueries({
-        queryKey: STOREFRONT_PRODUCTS_QUERY_KEY,
-        refetchType: 'none',
-      })
-      void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
-        console.error('Failed to revalidate default storefront products:', error)
-      })
-      return { products, loadError: false }
     }
 
     try {
@@ -171,9 +110,8 @@ export const Route = createFileRoute('/')({
         loadError: false,
       }
     } catch (error) {
-      console.error('Failed to load initial storefront products; using default products:', error)
-      const products = mapStoredProducts(DEFAULT_PRODUCTS)
-      return { products, loadError: false }
+      console.error('Failed to load storefront products from Supabase:', error)
+      return { products: [] as Product[], loadError: true }
     }
   },
   pendingComponent: StorefrontLoadingFallback,
@@ -309,8 +247,7 @@ function Storefront({
     } catch (error) {
       console.error('Failed to load products', error)
       if (storefrontMounted.current && request === productFetchRequest.current) {
-        setStoreProducts(current => current.length ? current : mapStoredProducts(DEFAULT_PRODUCTS))
-        setLoadStatus('ready')
+        setLoadStatus(current => current === 'ready' ? 'ready' : 'error')
       }
     }
   }, [])
@@ -332,6 +269,14 @@ function Storefront({
   // Product store notifications refresh the listing and any open Quick View.
   useEffect(() => {
     storefrontMounted.current = true
+    const localProducts = mapStoredProducts(getCachedProducts() ?? [])
+    if (localProducts.length > 0) {
+      setStoreProducts(localProducts)
+      setLoadStatus('ready')
+      queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, localProducts, { updatedAt: 0 })
+    } else {
+      setLoadStatus('loading')
+    }
     void refreshStoreProducts()
     const unsubscribe = subscribeToProducts(scheduleStoreProductRefresh)
     return () => {

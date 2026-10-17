@@ -71,209 +71,14 @@ export type StoredProduct = {
   createdAt?: string
 }
 
-export const DEFAULT_PRODUCTS: StoredProduct[] = [
-  {
-    id: 'default-premium-streetwear-hoodie-test',
-    name: 'هودي ستريت وير فاخر',
-    nameEn: 'Premium Streetwear Hoodie',
-    category: 'Clothing',
-    price: 349,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=90',
-    description: 'هودي ستريت وير فاخر بقصة مريحة وخيارات ألوان متعددة.',
-    descriptionEn: 'A premium streetwear hoodie with a relaxed fit, available in three classic colors.',
-    sizes: ['M', 'L', 'XL'],
-    colors: ['Black', 'White', 'Khaki'],
-    galleryImages: [
-      'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=90&crop=entropy',
-      'https://images.unsplash.com/photo-1578681994506-b8f463449011?auto=format&fit=crop&w=1200&q=90',
-      'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=1200&q=90',
-    ],
-  },
-  {
-    id: 'default-everyday-mag-case',
-    name: 'Everyday Mag Case',
-    nameEn: 'Everyday Mag Case',
-    category: 'Phone Cases',
-    price: 249,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1601592690120-a7cefd9c477a?auto=format&fit=crop&w=900&q=85',
-    description: 'كوري سليم وحامي مع لمسة مطفية مريحة للاستعمال اليومي.',
-    descriptionEn: 'A slim, protective case with a comfortable matte finish for everyday use.',
-  },
-  {
-    id: 'default-smartwatch',
-    name: 'ساعة ذكية نشطة',
-    nameEn: 'Active Smartwatch',
-    category: 'Smartwatches',
-    price: 899,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1750776100861-30c172651817?auto=format&fit=crop&w=900&q=85',
-    description: 'ساعة يومية متعددة الاستخدامات بشاشة واضحة وتتبع للنشاط طوال اليوم.',
-    descriptionEn: 'A versatile everyday smartwatch with a clear display and all-day activity tracking.',
-  },
-  {
-    id: 'default-minimalist-metal-bracelet',
-    name: 'سوار معدني مينيمالست',
-    nameEn: 'Minimalist Metal Bracelet',
-    category: 'Jewellery',
-    price: 349,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1611591475871-2ee8ab22349a?auto=format&fit=crop&w=900&q=85',
-    description: 'مصمم خصيصاً لأناقة يومية راقية من الستانلس ستيل.',
-    descriptionEn: 'A refined stainless-steel bracelet designed for elegant everyday wear.',
-  },
-  {
-    id: 'default-classic-silver-ring',
-    name: 'خاتم فضي كلاسيكي',
-    nameEn: 'Classic Silver Ring',
-    category: 'Jewellery',
-    price: 299,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1603561591411-07134e71a2a9?auto=format&fit=crop&w=900&q=85',
-    description: 'خاتم فضي مصقول بأسلوب كلاسيكي هادئ وراقي.',
-    descriptionEn: 'A polished silver ring with a timeless, understated style.',
-  },
-  {
-    id: 'default-modern-leather-sneakers',
-    name: 'حذاء جلدي عصري',
-    nameEn: 'Modern Leather Sneakers',
-    category: 'Sneakers',
-    price: 1199,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=900&q=85',
-    description: 'أحذية جلدية فاخرة تجمع بين الراحة القصوى والتصميم الحضري النظيف.',
-    descriptionEn: 'Premium leather sneakers combining lasting comfort with a clean urban design.',
-  },
-  {
-    id: 'default-pro-studio-headphones',
-    name: 'سماعات استوديو برو',
-    nameEn: 'Pro Studio Headphones',
-    category: 'Audio',
-    price: 549,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1600375104627-c94c416deefa?auto=format&fit=crop&w=900&q=85',
-    description: 'سماعات لاسلكية مدمجة لمكالمات واضحة وصوت غني.',
-    descriptionEn: 'Compact wireless headphones with clear calls and rich sound.',
-  },
-  {
-    id: 'default-classic-running-sneakers',
-    name: 'سبادريل الجري الكلاسيكي',
-    nameEn: 'Classic Running Sneakers',
-    category: 'Sneakers',
-    price: 899,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85',
-    description: 'حذاء رياضي خفيف مصمم للتمارين اليومية والمظهر العصري السهل.',
-    descriptionEn: 'Lightweight sneakers made for daily workouts and effortless casual style.',
-  },
-  {
-    id: 'default-magnetic-desk-charger',
-    name: 'شاحن مكتب مغناطيسي',
-    nameEn: 'Magnetic Desk Charger',
-    category: 'Chargers',
-    price: 329,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1642418714495-87fcca453f70?auto=format&fit=crop&w=900&q=85',
-    description: 'رفيق شحن أنيق يحافظ على طاقة أجهزتك ومكتبك منظماً.',
-    descriptionEn: 'A stylish charging companion that keeps your devices powered and desk tidy.',
-  },
-  {
-    id: 'default-streetwear-hoodie',
-    name: 'هودي ستريت وير',
-    nameEn: 'Everyday Streetwear Hoodie',
-    category: 'Clothing',
-    price: 349,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=85',
-    description: 'هودي قطني دافئ بقصة مريحة ولمسة عصرية، مناسب للخروج اليومي.',
-    descriptionEn: 'A soft cotton hoodie with a relaxed fit, made for comfortable everyday layering.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-  },
-  {
-    id: 'default-cotton-t-shirt',
-    name: 'تيشيرت أساسي من القطن',
-    nameEn: 'Essential Cotton T-Shirt',
-    category: 'Clothing',
-    price: 189,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85',
-    description: 'تيشيرت قطني خفيف وناعم، ساهل يتلبس مع أي إطلالة.',
-    descriptionEn: 'A lightweight, soft cotton tee that pairs easily with your everyday looks.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-  },
-  {
-    id: 'default-relaxed-linen-shirt',
-    name: 'قميجة كتان للصيف',
-    nameEn: 'Relaxed Linen Shirt',
-    category: 'Clothing',
-    price: 329,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=900&q=85',
-    description: 'قميجة كتان بقصة مرتاحة، كتخليك مرتاح وأنيق فالأيام الدافئة.',
-    descriptionEn: 'A breathable relaxed-fit linen shirt for effortless warm-weather style.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-  },
-  {
-    id: 'default-essential-oversized-hoodie',
-    name: 'هودي أساسي بقصة واسعة',
-    nameEn: 'Essential Oversized Hoodie',
-    category: 'Clothing',
-    price: 749,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=85',
-    description: 'هودي فاخر من القطن الثقيل بقصة واسعة وتفاصيل بسيطة للاستخدام اليومي.',
-    descriptionEn: 'A premium heavyweight cotton hoodie with an easy oversized fit and clean everyday styling.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-    materials: 'Heavyweight cotton fleece',
-  },
-  {
-    id: 'default-premium-cotton-sweatshirt',
-    name: 'سويت شيرت قطني فاخر',
-    nameEn: 'Premium Cotton Sweatshirt',
-    category: 'Clothing',
-    price: 549,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1578681994506-b8f463449011?auto=format&fit=crop&w=900&q=85',
-    description: 'سويت شيرت ناعم من القطن عالي الجودة بقصة مريحة وتشطيب أنيق.',
-    descriptionEn: 'A soft, premium cotton sweatshirt with a relaxed fit and refined finish.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-    materials: 'Premium brushed cotton',
-  },
-  {
-    id: 'default-minimalist-zip-jacket',
-    name: 'جاكيت بسحاب بتصميم بسيط',
-    nameEn: 'Minimalist Zip Jacket',
-    category: 'Clothing',
-    price: 899,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=900&q=85',
-    description: 'جاكيت أنيق بسحاب كامل وخطوط نظيفة، مثالي للطبقات في المواسم الانتقالية.',
-    descriptionEn: 'A polished full-zip jacket with clean lines, ideal for layering between seasons.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-    materials: 'Cotton-blend twill',
-  },
-  {
-    id: 'default-heavyweight-streetwear-tee',
-    name: 'تيشيرت ستريت وير من القطن الثقيل',
-    nameEn: 'Heavyweight Streetwear Tee',
-    category: 'Clothing',
-    price: 279,
-    stock: 10,
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=85',
-    description: 'تيشيرت ستريت وير من قطن متين بقصة واسعة وملمس فاخر.',
-    descriptionEn: 'A durable heavyweight cotton streetwear tee with a relaxed fit and premium feel.',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Charcoal', 'Black', 'Beige', 'White'],
-    materials: 'Heavyweight cotton jersey',
-  },
-]
+const LEGACY_DEMO_PRODUCT_IDS = new Set([
+  'default-premium-streetwear-hoodie-test', 'default-everyday-mag-case', 'default-smartwatch',
+  'default-classic-analog-watch', 'default-classic-sunglasses', 'default-minimalist-metal-bracelet',
+  'default-classic-silver-ring', 'default-modern-leather-sneakers', 'default-pro-studio-headphones',
+  'default-classic-running-sneakers', 'default-magnetic-desk-charger', 'default-streetwear-hoodie',
+  'default-cotton-t-shirt', 'default-relaxed-linen-shirt', 'default-essential-oversized-hoodie',
+  'default-premium-cotton-sweatshirt', 'default-minimalist-zip-jacket', 'default-heavyweight-streetwear-tee',
+])
 
 export type ProductStoreChange = {
   type: 'save' | 'delete' | 'replace'
@@ -287,7 +92,6 @@ export interface ProductStoreAdapter {
   saveProduct(product: StoredProduct): Promise<void>
   saveProducts(products: StoredProduct[]): Promise<void>
   deleteProduct(productId: string): Promise<void>
-  seedDefaultsIfEmpty?(): Promise<void>
   subscribe?(listener: (change: ProductStoreChange) => void): () => void
 }
 
@@ -412,7 +216,14 @@ function readCachedStoredProducts(): StoredProduct[] | null {
       console.warn('Ignoring invalid cached products.')
       return null
     }
-    return products as StoredProduct[]
+    const storedProducts = products as StoredProduct[]
+    const liveProducts = storedProducts.filter(
+      product => !LEGACY_DEMO_PRODUCT_IDS.has(product.id),
+    )
+    if (liveProducts.length !== storedProducts.length) {
+      persistStoredProducts(liveProducts)
+    }
+    return liveProducts
   } catch (error) {
     console.warn('Failed to read cached products:', error)
     return null
@@ -429,6 +240,16 @@ function persistStoredProducts(products: StoredProduct[]): void {
   try {
     localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify({
       products,
+      updatedAt: Date.now(),
+    }))
+    localStorage.setItem('ar-storefront-products', JSON.stringify({
+      products: products.map(product => ({
+        ...product,
+        nameEn: product.nameEn || product.name,
+        category: normalizeProductCategory(product.category ?? 'Accessories'),
+        description: product.description || '',
+        descriptionEn: product.descriptionEn || product.description || '',
+      })),
       updatedAt: Date.now(),
     }))
   } catch (error) {
@@ -469,7 +290,12 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
 
       const rows = (page.data ?? [])
         .map((row, index) => fromSupabaseRow(row as Record<string, unknown>, offset + index))
-        .filter(product => product.id && product.name && product.image)
+        .filter(product =>
+          product.id
+          && product.name
+          && product.image
+          && !LEGACY_DEMO_PRODUCT_IDS.has(product.id),
+        )
       products.push(...rows)
       if ((page.data ?? []).length < PRODUCT_PAGE_SIZE) return products
     } finally {
@@ -482,11 +308,11 @@ function refreshSupabaseProducts(): Promise<StoredProduct[]> {
   if (!supabaseProductsRequest) {
     supabaseProductsRequest = fetchSupabaseProducts()
       .then(products => {
-        const latestProducts = products.length
-          ? products
-          : DEFAULT_PRODUCTS.map(normalizeProduct)
+        const latestProducts = products
+        const hasChanged =
+          JSON.stringify(readCachedStoredProducts()) !== JSON.stringify(latestProducts)
         persistStoredProducts(latestProducts)
-        publishProductChange({ type: 'replace' })
+        if (hasChanged) publishProductChange({ type: 'replace' })
         return latestProducts
       })
       .finally(() => {
@@ -498,13 +324,11 @@ function refreshSupabaseProducts(): Promise<StoredProduct[]> {
 
 async function getProductsWithFallback(): Promise<StoredProduct[]> {
   const cachedProducts = readCachedStoredProducts()
-  if (!cachedProducts?.length) {
-    const fallbackProducts = DEFAULT_PRODUCTS.map(normalizeProduct)
-    persistStoredProducts(fallbackProducts)
+  if (cachedProducts?.length) {
     void refreshSupabaseProducts().catch(error => {
-      console.warn('Supabase product refresh failed; keeping default products:', error)
+      console.warn('Supabase product refresh failed; keeping cached products:', error)
     })
-    return fallbackProducts
+    return cachedProducts
   }
 
   try {
@@ -521,7 +345,7 @@ async function getProductsWithFallback(): Promise<StoredProduct[]> {
     } else {
       console.error('Supabase product query failed; using cached products:', error)
     }
-    return cachedProducts
+    return cachedProducts ?? []
   }
 }
 
@@ -555,6 +379,7 @@ const supabaseProductStore: ProductStoreAdapter = {
       ...products.filter(existing => existing.id !== normalized.id),
       normalized,
     ])
+    publishProductChange({ type: 'save', productId: normalized.id })
   },
   async saveProducts(products) {
     if (products.length === 0) return
@@ -578,17 +403,6 @@ const supabaseProductStore: ProductStoreAdapter = {
       .maybeSingle()
     if (error) throw error
     if (!data) throw new Error(`Product ${productId} was not found or could not be deleted.`)
-  },
-  async seedDefaultsIfEmpty() {
-    const client = requireSupabase()
-    const { data, error } = await client.from('products').select('id').limit(1)
-    if (error) throw error
-    if (data.length > 0) return
-
-    const { error: seedError } = await client
-      .from('products')
-      .upsert(DEFAULT_PRODUCTS.map(sanitizeProductForSupabase), { onConflict: 'id' })
-    if (seedError) throw seedError
   },
   subscribe(listener) {
     const client = requireSupabase()
@@ -662,10 +476,11 @@ export async function getStoredProducts(): Promise<StoredProduct[]> {
 }
 
 export async function saveProduct(product: StoredProduct): Promise<void> {
+  const normalized = normalizeProduct(product)
   try {
     const { data, error } = await requireSupabase()
       .from('products')
-      .upsert(sanitizeProductForSupabase(normalizeProduct(product)), { onConflict: 'id' })
+      .upsert(sanitizeProductForSupabase(normalized), { onConflict: 'id' })
       .select('id')
       .single()
     if (error) throw error
@@ -676,7 +491,11 @@ export async function saveProduct(product: StoredProduct): Promise<void> {
     console.error('saveProduct Supabase save error:', error)
     throw error
   }
-  publishProductChange({ type: 'save', productId: product.id })
+  persistProductChanges(products => [
+    ...products.filter(existing => existing.id !== normalized.id),
+    normalized,
+  ])
+  publishProductChange({ type: 'save', productId: normalized.id })
 }
 
 export async function createProduct(product: StoredProduct): Promise<void> {
@@ -688,20 +507,30 @@ export async function updateProduct(product: StoredProduct): Promise<void> {
 }
 
 export async function saveProducts(products: StoredProduct[]): Promise<void> {
+  if (products.length === 0) return
+  const savedProducts = products.map(normalizeProduct)
+  const savedIds = new Set(savedProducts.map(product => product.id))
+
   try {
-    if (products.length === 0) return
     const { error } = await requireSupabase()
       .from('products')
-      .upsert(products.map(product => sanitizeProductForSupabase(normalizeProduct(product))), { onConflict: 'id' })
+      .upsert(savedProducts.map(sanitizeProductForSupabase), { onConflict: 'id' })
     if (error) throw error
   } catch (error) {
     console.error('saveProducts Supabase bulk save error:', error)
     throw error
   }
+  persistProductChanges(existing => [
+    ...existing.filter(product => !savedIds.has(product.id)),
+    ...savedProducts,
+  ])
   publishProductChange({ type: 'replace' })
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
+  persistProductChanges(products => products.filter(product => product.id !== productId))
+  publishProductChange({ type: 'delete', productId })
+
   const { data, error } = await requireSupabase()
     .from('products')
     .delete()
@@ -709,18 +538,28 @@ export async function deleteProduct(productId: string): Promise<void> {
     .select('id')
     .maybeSingle()
   if (error) {
+    const errorCode = 'code' in error ? error.code : undefined
+    const errorMessage = 'message' in error ? String(error.message) : ''
+    if (errorCode === 'PGRST116' || /not found|0 rows|no rows/i.test(errorMessage)) return
     console.error('deleteProduct Supabase delete error:', error)
     throw error
   }
-  if (!data) {
-    throw new Error(`Product ${productId} was not found or could not be deleted.`)
-  }
-  persistProductChanges(products => products.filter(product => product.id !== productId))
-  publishProductChange({ type: 'delete', productId })
+  if (!data) return
 }
 
-export async function seedDefaultProductsIfEmpty(): Promise<void> {
-  await productStoreAdapter.seedDefaultsIfEmpty?.()
+export async function deleteAllProducts(): Promise<void> {
+  persistStoredProducts([])
+
+  const { error } = await requireSupabase()
+    .from('products')
+    .delete()
+    .not('id', 'is', null)
+  if (error) {
+    console.error('Bulk product deletion failed in Supabase:', error)
+    throw error
+  }
+
+  publishProductChange({ type: 'replace' })
 }
 
 export function subscribeToProducts(listener: (change: ProductStoreChange) => void): () => void {
