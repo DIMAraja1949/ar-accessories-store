@@ -391,6 +391,13 @@ function Storefront({
   const currentText = t[lang]
   const categoryLabel = (value: string) => (lang === 'ar' ? categoryLabels[value]?.ar : categoryLabels[value]?.en) ?? value
 
+  const categoryOptions = useMemo(() => {
+    const customCategories = [...new Set(storeProducts
+      .map(product => normalizeProductCategory(product.category))
+      .filter(value => !categories.includes(value)))]
+    return [...categories, ...customCategories]
+  }, [storeProducts])
+
   const filteredProducts = useMemo(() => {
     let result = storeProducts.filter(product =>
       (normalizeProductCategory(category) === 'All'
@@ -759,7 +766,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
 
           <div className="mt-6 flex flex-col gap-4 border-b border-border/60 pb-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2" role="group" aria-label="Filter products by category">
-              {categories.map(item => (
+              {categoryOptions.map(item => (
                 <button key={item} aria-pressed={category === item} onClick={() => setCategory(item)} className={`rounded-full border px-4 py-2 text-[11px] font-semibold transition-all duration-200 active:scale-95 ${category === item ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-card hover:border-primary hover:text-primary'}`}>
                   {categoryLabel(item)}
                 </button>

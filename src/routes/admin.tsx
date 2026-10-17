@@ -31,7 +31,9 @@ const getErrorMessage = (error: unknown) =>
       ? error.message
       : String(error)
 
-const emptyForm = { name: '', category: 'Phone Cases', price: '', originalPrice: '', stock: '10', image: '', galleryImages: '', description: '', details: '', materials: '', sizes: '', colors: '', rating: '', reviewCount: '' }
+const CUSTOM_CATEGORY = '__custom__'
+const FIXED_CATEGORIES = ['Phone Cases', 'Smartwatches', 'Audio', 'Jewellery', 'Sneakers', 'Chargers', 'Clothing'] as const
+const emptyForm = { name: '', category: 'Phone Cases', customCategory: '', price: '', originalPrice: '', stock: '10', image: '', galleryImages: '', description: '', details: '', materials: '', sizes: '', colors: '', rating: '', reviewCount: '' }
 const readImageFile = (file: File) => new Promise<string>((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = () => typeof reader.result === 'string'
@@ -224,9 +226,12 @@ function AdminDashboardRoute() {
   const startEdit = (row: ProductRow) => {
     setEditingId(row.id)
     setGalleryImagePreviews(row.galleryImages ?? [])
+    const normalizedCategory = normalizeProductCategory(row.category ?? 'Phone Cases')
+    const isFixedCategory = FIXED_CATEGORIES.some(category => category === normalizedCategory)
     setForm({
       name: row.name ?? '',
-      category: row.category ?? 'Phone Cases',
+      category: isFixedCategory ? normalizedCategory : CUSTOM_CATEGORY,
+      customCategory: isFixedCategory ? '' : row.category ?? '',
       price: String(row.price ?? ''),
       originalPrice: row.originalPrice != null ? String(row.originalPrice) : '',
       stock: String(row.stock ?? 10),
@@ -259,6 +264,11 @@ function AdminDashboardRoute() {
       toast.error('اختار صورة للمنتج قبل الحفظ.')
       return
     }
+    const category = form.category === CUSTOM_CATEGORY ? form.customCategory.trim() : form.category
+    if (!category) {
+      toast.error('دخل اسم القسم المخصص قبل الحفظ.')
+      return
+    }
     const sizes = form.sizes.split(',').map(size => size.trim()).filter(Boolean)
     const colors = form.colors.split(',').map(color => color.trim()).filter(Boolean)
     if (form.category === 'Clothing' && (sizes.length === 0 || colors.length === 0)) {
@@ -285,7 +295,7 @@ function AdminDashboardRoute() {
     const galleryImages = [...new Set([...galleryImagePreviews, ...galleryUrls])]
     const data = {
       name: form.name.trim(),
-      category: form.category,
+      category,
       price: Number(form.price),
       originalPrice,
       stock: Number.parseInt(form.stock || '10', 10),
@@ -433,10 +443,17 @@ function AdminDashboardRoute() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">القسم</label>
-                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="w-full h-12 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
-                  <option value="Phone Cases">Phone Cases</option><option value="Smartwatches">Smartwatches</option><option value="Audio">Audio</option><option value="Jewellery">Jewellery</option><option value="Sneakers">Sneakers</option><option value="Chargers">Chargers</option><option value="Clothing">Clothing / الملابس</option>
+                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value, customCategory: e.target.value === CUSTOM_CATEGORY ? form.customCategory : '' })} className="w-full h-12 rounded-xl border border-input bg-background px-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15">
+                  <option value="Phone Cases">Phone Cases</option><option value="Smartwatches">Smartwatches</option><option value="Audio">Audio</option><option value="Jewellery">Jewellery</option><option value="Sneakers">Sneakers</option><option value="Chargers">Chargers</option><option value="Clothing">Clothing / الملابس</option><option value={CUSTOM_CATEGORY}>Other / قسم جديد (Custom)</option>
                 </select>
               </div>
+
+              {form.category === CUSTOM_CATEGORY && (
+                <label className="block">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">اسم القسم المخصص</span>
+                  <input type="text" value={form.customCategory} onChange={e => setForm({ ...form, customCategory: e.target.value })} placeholder="مثال: Wallets" required className="h-12 w-full rounded-xl border border-input bg-background px-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                </label>
+              )}
 
               {form.category === 'Clothing' && (
                 <div className="grid gap-4 sm:grid-cols-2">
