@@ -9,6 +9,7 @@ const PRODUCT_PAGE_SIZE = 100
 const PRODUCT_FETCH_TIMEOUT_MS = 4500
 const PRODUCT_SELECT_COLUMNS =
   'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
+let supabaseProductsRequest: Promise<StoredProduct[]> | null = null
 const PRODUCT_CATEGORIES = [
   'Accessories',
   'Clothing',
@@ -477,11 +478,37 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
   }
 }
 
+function refreshSupabaseProducts(): Promise<StoredProduct[]> {
+  if (!supabaseProductsRequest) {
+    supabaseProductsRequest = fetchSupabaseProducts()
+      .then(products => {
+        const latestProducts = products.length
+          ? products
+          : DEFAULT_PRODUCTS.map(normalizeProduct)
+        persistStoredProducts(latestProducts)
+        publishProductChange({ type: 'replace' })
+        return latestProducts
+      })
+      .finally(() => {
+        supabaseProductsRequest = null
+      })
+  }
+  return supabaseProductsRequest
+}
+
 async function getProductsWithFallback(): Promise<StoredProduct[]> {
+  const cachedProducts = readCachedStoredProducts()
+  if (!cachedProducts?.length) {
+    const fallbackProducts = DEFAULT_PRODUCTS.map(normalizeProduct)
+    persistStoredProducts(fallbackProducts)
+    void refreshSupabaseProducts().catch(error => {
+      console.warn('Supabase product refresh failed; keeping default products:', error)
+    })
+    return fallbackProducts
+  }
+
   try {
-    const products = await fetchSupabaseProducts()
-    persistStoredProducts(products)
-    return products
+    return await refreshSupabaseProducts()
   } catch (error) {
     const isStatementTimeout =
       typeof error === 'object'
@@ -494,9 +521,7 @@ async function getProductsWithFallback(): Promise<StoredProduct[]> {
     } else {
       console.error('Supabase product query failed; using cached products:', error)
     }
-    const cachedProducts = readCachedStoredProducts()
-    if (cachedProducts) return cachedProducts
-    throw error
+    return cachedProducts
   }
 }
 

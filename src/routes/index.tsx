@@ -4,6 +4,7 @@ import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Pl
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
 import {
+  DEFAULT_PRODUCTS,
   getStoredProducts,
   normalizeProductCategory,
   STOREFRONT_PRODUCTS_QUERY_KEY,
@@ -133,7 +134,7 @@ export const Route = createFileRoute('/')({
   loader: async () => {
     const persistedProducts = readCachedProducts()
     if (
-      persistedProducts
+      persistedProducts?.products.length
       && !queryClient.getQueryData(STOREFRONT_PRODUCTS_QUERY_KEY)
     ) {
       queryClient.setQueryData(
@@ -144,11 +145,24 @@ export const Route = createFileRoute('/')({
     }
 
     const cachedProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
-    if (cachedProducts) {
+    if (cachedProducts?.length) {
       void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
         console.error('Failed to revalidate cached storefront products:', error)
       })
       return { products: cachedProducts, loadError: false }
+    }
+
+    if (cachedProducts) {
+      const products = mapStoredProducts(DEFAULT_PRODUCTS)
+      queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, products)
+      void queryClient.invalidateQueries({
+        queryKey: STOREFRONT_PRODUCTS_QUERY_KEY,
+        refetchType: 'none',
+      })
+      void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
+        console.error('Failed to revalidate default storefront products:', error)
+      })
+      return { products, loadError: false }
     }
 
     try {
@@ -157,8 +171,9 @@ export const Route = createFileRoute('/')({
         loadError: false,
       }
     } catch (error) {
-      console.error('Failed to load initial storefront products:', error)
-      return { products: [] as Product[], loadError: true }
+      console.error('Failed to load initial storefront products; using default products:', error)
+      const products = mapStoredProducts(DEFAULT_PRODUCTS)
+      return { products, loadError: false }
     }
   },
   pendingComponent: StorefrontLoadingFallback,
@@ -294,7 +309,8 @@ function Storefront({
     } catch (error) {
       console.error('Failed to load products', error)
       if (storefrontMounted.current && request === productFetchRequest.current) {
-        setLoadStatus(current => current === 'ready' ? 'ready' : 'error')
+        setStoreProducts(current => current.length ? current : mapStoredProducts(DEFAULT_PRODUCTS))
+        setLoadStatus('ready')
       }
     }
   }, [])
