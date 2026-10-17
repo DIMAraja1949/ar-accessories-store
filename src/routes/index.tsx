@@ -526,17 +526,25 @@ function Storefront({
   const appliedDiscount = appliedPromo === 'AR10' ? Math.round(subtotal * 0.1) : appliedPromo === 'FREESHIP' ? Math.min(50, subtotal) : 0
   const total = Math.max(0, subtotal - appliedDiscount)
 
-  const addToCart = async (product: Product, variant: { size?: string; color?: string } = {}) => {
+  const addToCart = async (
+    product: Product,
+    variant: { size?: string; color?: string } = {},
+    validateAgainstServer = true,
+  ) => {
     let latestProduct: Product | undefined
-    try {
-      const freshProducts = mapStoredProducts(await getStoredProducts())
-      setStoreProducts(freshProducts)
-      setLoadStatus('ready')
-      latestProduct = freshProducts.find(item => item.id === product.id)
-    } catch (error) {
-      console.error('Failed to validate product before adding it to the cart', error)
-      toast.error(lang === 'ar' ? 'تعذر التحقق من المنتج. حاول مرة أخرى.' : 'Could not verify this product. Please try again.')
-      return false
+    if (validateAgainstServer) {
+      try {
+        const freshProducts = mapStoredProducts(await getStoredProducts())
+        setStoreProducts(freshProducts)
+        setLoadStatus('ready')
+        latestProduct = freshProducts.find(item => item.id === product.id)
+      } catch (error) {
+        console.error('Failed to validate product before adding it to the cart', error)
+        toast.error(lang === 'ar' ? 'تعذر التحقق من المنتج. حاول مرة أخرى.' : 'Could not verify this product. Please try again.')
+        return false
+      }
+    } else {
+      latestProduct = storeProducts.find(item => item.id === product.id) ?? product
     }
     if (!latestProduct) {
       toast.error(lang === 'ar' ? 'هذا المنتج لم يعد متوفراً.' : 'This product is no longer available.')
@@ -583,7 +591,11 @@ function Storefront({
 
   const checkoutSelectedProduct = async () => {
     if (!selectedProduct) return
-    const added = await addToCart(selectedProduct, { size: selectedSize, color: selectedColor })
+    const added = await addToCart(
+      selectedProduct,
+      { size: selectedSize, color: selectedColor },
+      false,
+    )
     if (added) {
       setSelectedProduct(null)
       setCheckoutOpen(true)

@@ -6,7 +6,7 @@ export const PRODUCTS_CACHE_KEY = 'ar-products-cache'
 export const STOREFRONT_PRODUCTS_QUERY_KEY = ['storefront-products'] as const
 const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
 const PRODUCT_PAGE_SIZE = 100
-const PRODUCT_FETCH_TIMEOUT_MS = 10000
+const PRODUCT_FETCH_TIMEOUT_MS = 4500
 const PRODUCT_SELECT_COLUMNS =
   'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
 const PRODUCT_CATEGORIES = [
@@ -418,6 +418,10 @@ function readCachedStoredProducts(): StoredProduct[] | null {
   }
 }
 
+export function getCachedProducts(): StoredProduct[] | null {
+  return readCachedStoredProducts()
+}
+
 function persistStoredProducts(products: StoredProduct[]): void {
   if (typeof window === 'undefined') return
 
@@ -429,6 +433,11 @@ function persistStoredProducts(products: StoredProduct[]): void {
   } catch (error) {
     console.warn('Failed to persist cached products:', error)
   }
+}
+
+function persistProductChanges(update: (products: StoredProduct[]) => StoredProduct[]): void {
+  const products = readCachedStoredProducts() ?? []
+  persistStoredProducts(update(products))
 }
 
 async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
@@ -516,6 +525,11 @@ const supabaseProductStore: ProductStoreAdapter = {
       .from('products')
       .upsert(sanitizeProductForSupabase(normalizeProduct(product)), { onConflict: 'id' })
     if (error) throw error
+    const normalized = normalizeProduct(product)
+    persistProductChanges(products => [
+      ...products.filter(existing => existing.id !== normalized.id),
+      normalized,
+    ])
   },
   async saveProducts(products) {
     if (products.length === 0) return
@@ -523,6 +537,12 @@ const supabaseProductStore: ProductStoreAdapter = {
       .from('products')
       .upsert(products.map(product => sanitizeProductForSupabase(normalizeProduct(product))), { onConflict: 'id' })
     if (error) throw error
+    const savedProducts = products.map(normalizeProduct)
+    const savedIds = new Set(savedProducts.map(product => product.id))
+    persistProductChanges(existing => [
+      ...existing.filter(product => !savedIds.has(product.id)),
+      ...savedProducts,
+    ])
   },
   async deleteProduct(productId) {
     const { data, error } = await requireSupabase()
@@ -670,6 +690,7 @@ export async function deleteProduct(productId: string): Promise<void> {
   if (!data) {
     throw new Error(`Product ${productId} was not found or could not be deleted.`)
   }
+  persistProductChanges(products => products.filter(product => product.id !== productId))
   publishProductChange({ type: 'delete', productId })
 }
 

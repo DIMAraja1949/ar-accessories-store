@@ -5,6 +5,25 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 const allowedProductAdminEmail = 'chefabderrahim639@gmail.com'
+const SUPABASE_REQUEST_TIMEOUT_MS = 4000
+
+const fetchWithTimeout: typeof fetch = (input, init = {}) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), SUPABASE_REQUEST_TIMEOUT_MS)
+  const externalSignal = init.signal
+  const abortFromExternalSignal = () => controller.abort()
+
+  if (externalSignal?.aborted) {
+    abortFromExternalSignal()
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternalSignal, { once: true })
+  }
+
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
+    clearTimeout(timeoutId)
+    externalSignal?.removeEventListener('abort', abortFromExternalSignal)
+  })
+}
 
 export function isAllowedProductAdminEmail(email: string | undefined): boolean {
   return email?.trim().toLowerCase() === allowedProductAdminEmail
@@ -23,6 +42,8 @@ export const supabase = isSupabaseConfigured
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      global: { fetch: fetchWithTimeout },
+      realtime: { timeout: SUPABASE_REQUEST_TIMEOUT_MS },
     })
   : null
 

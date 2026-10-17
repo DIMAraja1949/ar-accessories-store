@@ -6,6 +6,7 @@ import { OptimizedImage } from '@/components/OptimizedImage'
 import {
   DEFAULT_PRODUCTS,
   deleteProduct,
+  getCachedProducts,
   getStoredProducts,
   normalizeProductCategory,
   seedDefaultProductsIfEmpty,
@@ -60,8 +61,9 @@ function AdminDashboardRoute() {
   const [form, setForm] = useState(emptyForm)
   const [galleryImagePreviews, setGalleryImagePreviews] = useState<string[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [items, setItems] = useState<ProductRow[]>([])
-  const [listLoading, setListLoading] = useState(false)
+  const [cachedProductsAtMount] = useState(() => getCachedProducts())
+  const [items, setItems] = useState<ProductRow[]>(() => cachedProductsAtMount ?? [])
+  const [listLoading, setListLoading] = useState(() => cachedProductsAtMount === null)
   const [seeding, setSeeding] = useState(false)
 
   useEffect(() => {
@@ -115,7 +117,6 @@ function AdminDashboardRoute() {
   }, [])
 
   const fetchProducts = useCallback(async () => {
-    setListLoading(true)
     try {
       const rows = await getStoredProducts()
       const sorted = [...rows].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
@@ -133,20 +134,21 @@ function AdminDashboardRoute() {
     try {
       await fetchProducts()
     } catch (error) {
-      console.error('Failed to fetch admin products from Supabase:', error)
-      toast.error('ما قدرناش نجيبو المنتجات', { description: getErrorMessage(error) })
+      console.warn('Admin product refresh failed; keeping cached products:', error)
     }
   }, [fetchProducts])
 
   useEffect(() => {
     if (!isAuthed) return
-    void (async () => {
-      await seedDefaultProductsIfEmpty()
-      await loadProducts()
-    })().catch(error => {
-      console.error('Failed to initialize admin products:', error)
-      toast.error('ما قدرناش نجهزو المنتجات', { description: getErrorMessage(error) })
-    })
+    const cachedProducts = getCachedProducts()
+    if (cachedProducts?.length) {
+      void loadProducts()
+    } else {
+      void loadProducts()
+      void seedDefaultProductsIfEmpty()
+        .catch(error => console.warn('Could not initialize default products:', error))
+        .then(loadProducts)
+    }
     return subscribeToProducts(() => {
       void queryClient.invalidateQueries({ queryKey: STOREFRONT_PRODUCTS_QUERY_KEY })
       void loadProducts()
