@@ -10,6 +10,7 @@ const PRODUCT_FETCH_TIMEOUT_MS = 4500
 const PRODUCT_SELECT_COLUMNS =
   'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
 let supabaseProductsRequest: Promise<StoredProduct[]> | null = null
+let productMutationRevision = 0
 const PRODUCT_CATEGORIES = [
   'Accessories',
   'Clothing',
@@ -306,8 +307,12 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
 
 function refreshSupabaseProducts(): Promise<StoredProduct[]> {
   if (!supabaseProductsRequest) {
+    const revisionAtStart = productMutationRevision
     supabaseProductsRequest = fetchSupabaseProducts()
       .then(products => {
+        if (revisionAtStart !== productMutationRevision) {
+          return readCachedStoredProducts() ?? products
+        }
         const latestProducts = products
         const hasChanged =
           JSON.stringify(readCachedStoredProducts()) !== JSON.stringify(latestProducts)
@@ -491,6 +496,7 @@ export async function saveProduct(product: StoredProduct): Promise<void> {
     console.error('saveProduct Supabase save error:', error)
     throw error
   }
+  productMutationRevision += 1
   persistProductChanges(products => [
     ...products.filter(existing => existing.id !== normalized.id),
     normalized,
@@ -520,6 +526,7 @@ export async function saveProducts(products: StoredProduct[]): Promise<void> {
     console.error('saveProducts Supabase bulk save error:', error)
     throw error
   }
+  productMutationRevision += 1
   persistProductChanges(existing => [
     ...existing.filter(product => !savedIds.has(product.id)),
     ...savedProducts,
@@ -528,6 +535,7 @@ export async function saveProducts(products: StoredProduct[]): Promise<void> {
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
+  productMutationRevision += 1
   persistProductChanges(products => products.filter(product => product.id !== productId))
   publishProductChange({ type: 'delete', productId })
 
@@ -548,8 +556,6 @@ export async function deleteProduct(productId: string): Promise<void> {
 }
 
 export async function deleteAllProducts(): Promise<void> {
-  persistStoredProducts([])
-
   const { error } = await requireSupabase()
     .from('products')
     .delete()
@@ -559,6 +565,8 @@ export async function deleteAllProducts(): Promise<void> {
     throw error
   }
 
+  productMutationRevision += 1
+  persistStoredProducts([])
   publishProductChange({ type: 'replace' })
 }
 

@@ -91,9 +91,10 @@ function storefrontProductQueryOptions() {
 export const Route = createFileRoute('/')({
   loader: async () => {
     const queryProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
-    const cachedProducts = queryProducts ?? mapStoredProducts(getCachedProducts() ?? [])
+    const persistedProducts = mapStoredProducts(getCachedProducts() ?? [])
+    const cachedProducts = persistedProducts.length > 0 ? persistedProducts : queryProducts ?? []
     if (cachedProducts.length > 0) {
-      if (!queryProducts) {
+      if (JSON.stringify(queryProducts) !== JSON.stringify(cachedProducts)) {
         queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, cachedProducts, {
           updatedAt: 0,
         })
