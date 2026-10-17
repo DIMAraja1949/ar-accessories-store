@@ -267,7 +267,8 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
   const client = requireSupabase()
   const products: StoredProduct[] = []
 
-  for (let offset = 0; ; offset += PRODUCT_PAGE_SIZE) {
+  let offset = 0
+  for (;;) {
     const controller = new AbortController()
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const timeout = new Promise<never>((_resolve, reject) => {
@@ -283,13 +284,16 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
           .from('products')
           .select(PRODUCT_SELECT_COLUMNS)
           .order('created_at', { ascending: false })
+          .order('id', { ascending: true })
           .range(offset, offset + PRODUCT_PAGE_SIZE - 1)
           .abortSignal(controller.signal),
         timeout,
       ])
       if (page.error) throw page.error
+      const pageRows = page.data ?? []
+      if (pageRows.length === 0) return products
 
-      const rows = (page.data ?? [])
+      const rows = pageRows
         .map((row, index) => fromSupabaseRow(row as Record<string, unknown>, offset + index))
         .filter(product =>
           product.id
@@ -298,7 +302,7 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
           && !LEGACY_DEMO_PRODUCT_IDS.has(product.id),
         )
       products.push(...rows)
-      if ((page.data ?? []).length < PRODUCT_PAGE_SIZE) return products
+      offset += pageRows.length
     } finally {
       if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
