@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { ClientOnly, createFileRoute } from '@tanstack/react-router'
+import { ClientOnly, createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowRight, Download, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
@@ -12,6 +12,7 @@ import {
   saveProduct,
   saveProducts,
   subscribeToProducts,
+  STOREFRONT_PRODUCTS_QUERY_KEY,
   type StoredProduct,
 } from '@/lib/products-storage'
 import {
@@ -21,6 +22,7 @@ import {
   signOutProductAdmin,
   supabase,
 } from '@/lib/supabase'
+import { queryClient } from '@/lib/query-client'
 
 type ProductRow = StoredProduct
 
@@ -145,7 +147,10 @@ function AdminDashboardRoute() {
       console.error('Failed to initialize admin products:', error)
       toast.error('ما قدرناش نجهزو المنتجات', { description: getErrorMessage(error) })
     })
-    return subscribeToProducts(() => { void loadProducts() })
+    return subscribeToProducts(() => {
+      void queryClient.invalidateQueries({ queryKey: STOREFRONT_PRODUCTS_QUERY_KEY })
+      void loadProducts()
+    })
   }, [isAuthed, loadProducts])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -402,7 +407,7 @@ function AdminDashboardRoute() {
             <button type="submit" disabled={!email || !password} className="mt-5 h-12 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110 active:scale-95 disabled:opacity-60">
               دخول
             </button>
-            <a href="/" className="mt-4 block text-center text-xs font-semibold text-muted-foreground transition hover:text-foreground">العودة للمتجر</a>
+            <Link to="/" preload="intent" className="mt-4 block text-center text-xs font-semibold text-muted-foreground transition hover:text-foreground">العودة للمتجر</Link>
           </form>
         </main>
       </ClientOnly>
@@ -426,9 +431,9 @@ function AdminDashboardRoute() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <a href="/" className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold transition hover:border-primary active:scale-95">
+                <Link to="/" preload="intent" className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold transition hover:border-primary active:scale-95">
                   العودة للمتجر <ArrowRight size={14} className="rotate-180" />
-                </a>
+                </Link>
                 <button type="button" onClick={handleLogout} aria-label="تسجيل الخروج" className="grid h-9 w-9 place-items-center rounded-full border border-border transition hover:border-primary hover:text-primary active:scale-95">
                   <LogOut size={15} />
                 </button>

@@ -4,9 +4,10 @@ import {
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
+import { queryClient } from '@/lib/query-client'
 import type { ReactNode } from 'react'
 import indexCss from '../index.css?url'
 
@@ -24,8 +25,6 @@ const SITE_DESCRIPTION =
  * falling back to the system preference.
  */
 const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`
-
-const queryClient = new QueryClient()
 
 /**
  * Root route: owns the HTML document (SSR), the global <head> (SEO) and the

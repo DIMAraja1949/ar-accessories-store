@@ -6,11 +6,13 @@ import { OptimizedImage } from '@/components/OptimizedImage'
 import {
   getStoredProducts,
   normalizeProductCategory,
+  STOREFRONT_PRODUCTS_QUERY_KEY,
   subscribeToProducts,
   type StoredProduct,
 } from '@/lib/products-storage'
 import { getProductColorLabel } from '@/lib/product-variants'
 import { ProductVariantSelector } from '@/components/ProductVariantSelector'
+import { queryClient } from '@/lib/query-client'
 
 type Product = { id: string; name: string; nameEn: string; category: string; price: number; image: string; tag?: string; tagEn?: string; description: string; descriptionEn: string; sizes?: string[]; colors?: string[]; galleryImages?: string[]; originalPrice?: number; rating?: number; reviewCount?: number; materials?: string; details?: string }
 type CartLine = { id: string; quantity: number; size?: string; color?: string }
@@ -57,12 +59,101 @@ const categoryLabels: Record<string, { ar: string; en: string }> = {
 
 const formatPrice = (price: number) => `${price.toLocaleString('fr-MA')} DH`
 const cartLineKey = (line: CartLine) => JSON.stringify([line.id, line.size ?? '', line.color ?? ''])
+const STOREFRONT_PRODUCTS_CACHE_KEY = 'ar-storefront-products'
+const PRODUCT_STALE_TIME = 1000 * 60 * 5
+const PRODUCT_GC_TIME = 1000 * 60 * 30
+
+function isCachedProduct(value: unknown): value is Product {
+  if (!value || typeof value !== 'object') return false
+  const product = value as Record<string, unknown>
+  return typeof product.id === 'string'
+    && typeof product.name === 'string'
+    && typeof product.nameEn === 'string'
+    && typeof product.category === 'string'
+    && typeof product.image === 'string'
+    && typeof product.description === 'string'
+    && typeof product.descriptionEn === 'string'
+    && typeof product.price === 'number'
+    && Number.isFinite(product.price)
+}
+
+function readCachedProducts(): { products: Product[]; updatedAt: number } | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = localStorage.getItem(STOREFRONT_PRODUCTS_CACHE_KEY)
+    if (!raw) return null
+    const cached: unknown = JSON.parse(raw)
+    if (!cached || typeof cached !== 'object') {
+      console.warn('Ignoring invalid persisted storefront product cache.')
+      return null
+    }
+    const record = cached as { products?: unknown; updatedAt?: unknown }
+    if (
+      !Array.isArray(record.products)
+      || !record.products.every(isCachedProduct)
+      || typeof record.updatedAt !== 'number'
+      || !Number.isFinite(record.updatedAt)
+    ) {
+      console.warn('Ignoring invalid persisted storefront product cache.')
+      return null
+    }
+    return { products: record.products, updatedAt: record.updatedAt }
+  } catch (error) {
+    console.warn('Failed to read persisted storefront products:', error)
+    return null
+  }
+}
+
+async function fetchStorefrontProducts(): Promise<Product[]> {
+  const products = mapStoredProducts(await getStoredProducts())
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STOREFRONT_PRODUCTS_CACHE_KEY, JSON.stringify({
+        products,
+        updatedAt: Date.now(),
+      }))
+    } catch (error) {
+      console.warn('Failed to persist storefront products:', error)
+    }
+  }
+  return products
+}
+
+function storefrontProductQueryOptions() {
+  return {
+    queryKey: STOREFRONT_PRODUCTS_QUERY_KEY,
+    queryFn: fetchStorefrontProducts,
+    staleTime: PRODUCT_STALE_TIME,
+    gcTime: PRODUCT_GC_TIME,
+  }
+}
 
 export const Route = createFileRoute('/')({
   loader: async () => {
+    const persistedProducts = readCachedProducts()
+    if (
+      persistedProducts
+      && !queryClient.getQueryData(STOREFRONT_PRODUCTS_QUERY_KEY)
+    ) {
+      queryClient.setQueryData(
+        STOREFRONT_PRODUCTS_QUERY_KEY,
+        persistedProducts.products,
+        { updatedAt: persistedProducts.updatedAt },
+      )
+    }
+
+    const cachedProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
+    if (cachedProducts) {
+      void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
+        console.error('Failed to revalidate cached storefront products:', error)
+      })
+      return { products: cachedProducts, loadError: false }
+    }
+
     try {
       return {
-        products: mapStoredProducts(await getStoredProducts()),
+        products: await queryClient.fetchQuery(storefrontProductQueryOptions()),
         loadError: false,
       }
     } catch (error) {
@@ -195,7 +286,7 @@ function Storefront({
   const refreshStoreProducts = useCallback(async () => {
     const request = ++productFetchRequest.current
     try {
-      const products = mapStoredProducts(await getStoredProducts())
+      const products = await queryClient.fetchQuery(storefrontProductQueryOptions())
       if (!storefrontMounted.current || request !== productFetchRequest.current) return
       setStoreProducts(products)
       setSelectedProduct(current => current ? products.find(product => product.id === current.id) ?? null : null)
@@ -214,6 +305,10 @@ function Storefront({
     }
     productRefreshTimeout.current = window.setTimeout(() => {
       productRefreshTimeout.current = null
+      void queryClient.invalidateQueries({
+        queryKey: STOREFRONT_PRODUCTS_QUERY_KEY,
+        refetchType: 'none',
+      })
       void refreshStoreProducts()
     }, 75)
   }, [refreshStoreProducts])
@@ -1013,7 +1108,7 @@ ${lang === 'ar' ? 'طريقة الدفع: عند الاستلام (COD)' : 'Paym
                           src={galleryImages[galleryImages.length - 1]}
                           alt={lang === 'ar' ? `تفاصيل ${selectedProduct.name}` : `${selectedProduct.nameEn} detail`}
                           width={600}
-                          className="aspect-[4/3] max-h-56 w-full rounded-xl"
+                          className="aspect-4/3 max-h-56 w-full rounded-xl"
                         />
                       )}
                     </>

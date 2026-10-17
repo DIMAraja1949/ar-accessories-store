@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 
 export const PRODUCTS_STORAGE_KEY = 'ar-products'
 export const PRODUCTS_STORAGE_EVENT = 'ar-products-change'
+export const STOREFRONT_PRODUCTS_QUERY_KEY = ['storefront-products'] as const
 const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
 const PRODUCT_CATEGORIES = [
   'Accessories',
