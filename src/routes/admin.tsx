@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { ClientOnly, createFileRoute, Link } from '@tanstack/react-router'
-import { ArrowRight, Lock, LogOut, PackagePlus, Pencil, ShieldCheck, Trash2, X } from 'lucide-react'
+import { ArrowRight, Lock, LogOut, PackagePlus, Pencil, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
 import {
   deleteAllProducts,
   deleteProduct,
   getCachedProducts,
-  getStoredProducts,
   normalizeProductCategory,
   saveProduct,
   subscribeToProducts,
   STOREFRONT_PRODUCTS_QUERY_KEY,
+  syncProductsFromSupabase,
   type StoredProduct,
 } from '@/lib/products-storage'
 import {
@@ -61,7 +61,8 @@ function AdminDashboardRoute() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [cachedProductsAtMount] = useState(() => getCachedProducts())
   const [items, setItems] = useState<ProductRow[]>(() => cachedProductsAtMount ?? [])
-  const [listLoading, setListLoading] = useState(() => cachedProductsAtMount === null)
+  const [listLoading, setListLoading] = useState(() => !cachedProductsAtMount?.length)
+  const [syncingProducts, setSyncingProducts] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
 
   useEffect(() => {
@@ -116,7 +117,7 @@ function AdminDashboardRoute() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const rows = await getStoredProducts()
+      const rows = await syncProductsFromSupabase()
       const sorted = [...rows].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))
       setItems(sorted)
       return sorted
@@ -135,6 +136,20 @@ function AdminDashboardRoute() {
       console.warn('Admin product refresh failed; keeping cached products:', error)
     }
   }, [fetchProducts])
+
+  const handleSyncProducts = async () => {
+    setSyncingProducts(true)
+    try {
+      const rows = await fetchProducts()
+      toast.success(`تمت مزامنة ${rows.length} منتج من قاعدة البيانات.`)
+    } catch (error) {
+      toast.error('تعذرت مزامنة المنتجات من قاعدة البيانات.', {
+        description: getErrorMessage(error),
+      })
+    } finally {
+      setSyncingProducts(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthed) return
@@ -422,6 +437,15 @@ function AdminDashboardRoute() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncProducts}
+                  disabled={syncingProducts}
+                  className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold transition hover:border-primary active:scale-95 disabled:opacity-60"
+                >
+                  <RefreshCw size={14} className={syncingProducts ? 'animate-spin' : ''} />
+                  {syncingProducts ? 'جاري المزامنة...' : 'مزامنة البيانات من الداتابيز'}
+                </button>
                 <Link to="/" preload="intent" className="flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold transition hover:border-primary active:scale-95">
                   العودة للمتجر <ArrowRight size={14} className="rotate-180" />
                 </Link>

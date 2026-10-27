@@ -458,6 +458,10 @@ export async function getStoredProducts(): Promise<StoredProduct[]> {
   return productStoreAdapter.getProducts()
 }
 
+export async function syncProductsFromSupabase(): Promise<StoredProduct[]> {
+  return refreshSupabaseProducts()
+}
+
 export async function saveProduct(product: StoredProduct): Promise<void> {
   const normalized = normalizeProduct(product)
   try {
