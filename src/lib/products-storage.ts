@@ -8,7 +8,7 @@ const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
 const PRODUCT_PAGE_SIZE = 100
 const PRODUCT_FETCH_TIMEOUT_MS = 4500
 const PRODUCT_SELECT_COLUMNS =
-  'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
+  'id,name,name_en,category,price,original_price,stock,image,tag,tag_en,description,description_en,sizes,colors,gallery_images,rating,review_count,materials,details,created_at'
 let supabaseProductsRequest: Promise<StoredProduct[]> | null = null
 let productMutationRevision = 0
 const PRODUCT_CATEGORIES = [
@@ -72,15 +72,6 @@ export type StoredProduct = {
   createdAt?: string
 }
 
-const LEGACY_DEMO_PRODUCT_IDS = new Set([
-  'default-premium-streetwear-hoodie-test', 'default-everyday-mag-case', 'default-smartwatch',
-  'default-classic-analog-watch', 'default-classic-sunglasses', 'default-minimalist-metal-bracelet',
-  'default-classic-silver-ring', 'default-modern-leather-sneakers', 'default-pro-studio-headphones',
-  'default-classic-running-sneakers', 'default-magnetic-desk-charger', 'default-streetwear-hoodie',
-  'default-cotton-t-shirt', 'default-relaxed-linen-shirt', 'default-essential-oversized-hoodie',
-  'default-premium-cotton-sweatshirt', 'default-minimalist-zip-jacket', 'default-heavyweight-streetwear-tee',
-])
-
 export type ProductStoreChange = {
   type: 'save' | 'delete' | 'replace'
   productId?: string
@@ -98,24 +89,24 @@ export interface ProductStoreAdapter {
 
 type SupabaseProductRow = {
   id: string
-  title: string
-  title_en: string | null
+  name: string
+  name_en: string | null
   category: string
   price: number
   original_price: number | null
   stock: number
-  featured_image: string
-  tags: string[]
+  image: string
+  tag: string | null
+  tag_en: string | null
   description: string | null
   description_en: string | null
-  short_description: string | null
   sizes: string[]
   colors: string[]
   gallery_images: string[]
   rating: number | null
-  reviews_count: number | null
+  review_count: number | null
   materials: string | null
-  details_material: string | null
+  details: string | null
   created_at: string
 }
 
@@ -133,53 +124,54 @@ function fromSupabaseRow(row: Record<string, unknown>, index: number): StoredPro
 
   return normalizeProduct({
     id: text(row.id, `product-${index}`),
-    name: text(row.title, 'Untitled product'),
-    nameEn: optionalText(row.title_en),
+    name: text(row.name, 'Untitled product'),
+    nameEn: optionalText(row.name_en),
     category: text(row.category, 'Accessories'),
     price: number(row.price, 0),
     originalPrice: row.original_price == null ? undefined : number(row.original_price, 0),
     stock: number(row.stock, 0),
-    image: text(row.featured_image, '/icon.png'),
-    tag: stringArray(row.tags).join(', ') || undefined,
-    description: text(row.description, text(row.short_description, '')),
+    image: text(row.image, '/icon.png'),
+    tag: optionalText(row.tag),
+    tagEn: optionalText(row.tag_en),
+    description: text(row.description, ''),
     descriptionEn: optionalText(row.description_en),
     sizes: stringArray(row.sizes),
     colors: stringArray(row.colors),
     galleryImages: stringArray(row.gallery_images),
     rating: row.rating == null ? undefined : number(row.rating, 0),
-    reviewCount: row.reviews_count == null ? undefined : number(row.reviews_count, 0),
+    reviewCount: row.review_count == null ? undefined : number(row.review_count, 0),
     materials: optionalText(row.materials),
-    details: optionalText(row.details_material),
+    details: optionalText(row.details),
     createdAt: optionalText(row.created_at),
   })
 }
 
 type SupabaseProductWrite = Pick<
   SupabaseProductRow,
-  'id' | 'title' | 'category' | 'price' | 'stock' | 'featured_image'
-> & Partial<Omit<SupabaseProductRow, 'id' | 'title' | 'category' | 'price' | 'stock' | 'featured_image'>>
+  'id' | 'name' | 'category' | 'price' | 'stock' | 'image'
+> & Partial<Omit<SupabaseProductRow, 'id' | 'name' | 'category' | 'price' | 'stock' | 'image'>>
 
 function sanitizeProductForSupabase(product: StoredProduct): SupabaseProductWrite {
   return {
     id: product.id,
-    title: product.name,
+    name: product.name,
     category: normalizeProductCategory(product.category ?? 'Accessories'),
     price: product.price,
     stock: product.stock ?? 0,
-    featured_image: product.image,
+    image: product.image,
     sizes: product.sizes ?? [],
     colors: product.colors ?? [],
     gallery_images: product.galleryImages ?? [],
-    ...(product.nameEn !== undefined ? { title_en: product.nameEn } : {}),
+    ...(product.nameEn !== undefined ? { name_en: product.nameEn } : {}),
     ...(product.originalPrice !== undefined ? { original_price: product.originalPrice } : {}),
-    ...(product.tag !== undefined ? { tags: product.tag.split(',').map(tag => tag.trim()).filter(Boolean) } : {}),
+    ...(product.tag !== undefined ? { tag: product.tag } : {}),
+    ...(product.tagEn !== undefined ? { tag_en: product.tagEn } : {}),
     ...(product.description !== undefined ? { description: product.description } : {}),
     ...(product.descriptionEn !== undefined ? { description_en: product.descriptionEn } : {}),
-    ...(product.description !== undefined ? { short_description: product.description } : {}),
     ...(product.rating !== undefined ? { rating: product.rating } : {}),
-    ...(product.reviewCount !== undefined ? { reviews_count: product.reviewCount } : {}),
+    ...(product.reviewCount !== undefined ? { review_count: product.reviewCount } : {}),
     ...(product.materials !== undefined ? { materials: product.materials } : {}),
-    ...(product.details !== undefined ? { details_material: product.details } : {}),
+    ...(product.details !== undefined ? { details: product.details } : {}),
     ...(product.createdAt !== undefined ? { created_at: product.createdAt } : {}),
   }
 }
@@ -217,14 +209,7 @@ function readCachedStoredProducts(): StoredProduct[] | null {
       console.warn('Ignoring invalid cached products.')
       return null
     }
-    const storedProducts = products as StoredProduct[]
-    const liveProducts = storedProducts.filter(
-      product => !LEGACY_DEMO_PRODUCT_IDS.has(product.id),
-    )
-    if (liveProducts.length !== storedProducts.length) {
-      persistStoredProducts(liveProducts)
-    }
-    return liveProducts
+    return products as StoredProduct[]
   } catch (error) {
     console.warn('Failed to read cached products:', error)
     return null
@@ -293,14 +278,9 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
       const pageRows = page.data ?? []
       if (pageRows.length === 0) return products
 
-      const rows = pageRows
-        .map((row, index) => fromSupabaseRow(row as Record<string, unknown>, offset + index))
-        .filter(product =>
-          product.id
-          && product.name
-          && product.image
-          && !LEGACY_DEMO_PRODUCT_IDS.has(product.id),
-        )
+      const rows = pageRows.map((row, index) =>
+        fromSupabaseRow(row as Record<string, unknown>, offset + index),
+      )
       products.push(...rows)
       offset += pageRows.length
     } finally {
@@ -311,19 +291,20 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
 
 function refreshSupabaseProducts(): Promise<StoredProduct[]> {
   if (!supabaseProductsRequest) {
-    const revisionAtStart = productMutationRevision
-    supabaseProductsRequest = fetchSupabaseProducts()
-      .then(products => {
-        if (revisionAtStart !== productMutationRevision) {
-          return readCachedStoredProducts() ?? products
-        }
-        const latestProducts = products
-        const hasChanged =
-          JSON.stringify(readCachedStoredProducts()) !== JSON.stringify(latestProducts)
-        persistStoredProducts(latestProducts)
-        if (hasChanged) publishProductChange({ type: 'replace' })
-        return latestProducts
-      })
+    supabaseProductsRequest = (async () => {
+      let revisionAtStart = productMutationRevision
+      let products = await fetchSupabaseProducts()
+      while (revisionAtStart !== productMutationRevision) {
+        revisionAtStart = productMutationRevision
+        products = await fetchSupabaseProducts()
+      }
+      const latestProducts = products
+      const hasChanged =
+        JSON.stringify(readCachedStoredProducts()) !== JSON.stringify(latestProducts)
+      persistStoredProducts(latestProducts)
+      if (hasChanged) publishProductChange({ type: 'replace' })
+      return latestProducts
+    })()
       .finally(() => {
         supabaseProductsRequest = null
       })
@@ -333,13 +314,6 @@ function refreshSupabaseProducts(): Promise<StoredProduct[]> {
 
 async function getProductsWithFallback(): Promise<StoredProduct[]> {
   const cachedProducts = readCachedStoredProducts()
-  if (cachedProducts?.length) {
-    void refreshSupabaseProducts().catch(error => {
-      console.warn('Supabase product refresh failed; keeping cached products:', error)
-    })
-    return cachedProducts
-  }
-
   try {
     return await refreshSupabaseProducts()
   } catch (error) {

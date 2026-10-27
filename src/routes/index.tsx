@@ -91,28 +91,21 @@ function storefrontProductQueryOptions() {
 export const Route = createFileRoute('/')({
   loader: async () => {
     const queryProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
-    const persistedProducts = mapStoredProducts(getCachedProducts() ?? [])
-    const cachedProducts = persistedProducts.length > 0 ? persistedProducts : queryProducts ?? []
-    if (cachedProducts.length > 0) {
-      if (JSON.stringify(queryProducts) !== JSON.stringify(cachedProducts)) {
-        queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, cachedProducts, {
-          updatedAt: 0,
-        })
-      }
-      void queryClient.fetchQuery(storefrontProductQueryOptions()).catch(error => {
-        console.error('Failed to revalidate cached storefront products:', error)
-      })
-      return { products: cachedProducts, loadError: false }
-    }
-
     try {
       return {
-        products: await queryClient.fetchQuery(storefrontProductQueryOptions()),
+        products: await queryClient.fetchQuery({
+          ...storefrontProductQueryOptions(),
+          staleTime: 0,
+        }),
         loadError: false,
       }
     } catch (error) {
       console.error('Failed to load storefront products from Supabase:', error)
-      return { products: [] as Product[], loadError: true }
+      const persistedProducts = mapStoredProducts(getCachedProducts() ?? [])
+      return {
+        products: persistedProducts.length > 0 ? persistedProducts : queryProducts ?? [],
+        loadError: true,
+      }
     }
   },
   pendingComponent: StorefrontLoadingFallback,
