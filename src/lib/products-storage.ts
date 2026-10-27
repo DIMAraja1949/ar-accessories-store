@@ -7,8 +7,6 @@ export const STOREFRONT_PRODUCTS_QUERY_KEY = ['storefront-products'] as const
 const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
 const PRODUCT_PAGE_SIZE = 100
 const PRODUCT_FETCH_TIMEOUT_MS = 4500
-const PRODUCT_SELECT_COLUMNS =
-  'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
 let supabaseProductsRequest: Promise<StoredProduct[]> | null = null
 let productMutationRevision = 0
 const PRODUCT_CATEGORIES = [
@@ -122,26 +120,30 @@ function fromSupabaseRow(row: Record<string, unknown>, index: number): StoredPro
   const stringArray = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
   const tags = stringArray(row.tags)
+  const tag = optionalText(row.tag) ?? (tags.join(', ') || undefined)
 
   return normalizeProduct({
     id: text(row.id, `product-${index}`),
-    name: text(row.title, 'Untitled product'),
-    nameEn: optionalText(row.title_en),
+    name: text(row.title, text(row.name, 'Untitled product')),
+    nameEn: optionalText(row.title_en) ?? optionalText(row.name_en),
     category: text(row.category, 'Accessories'),
     price: number(row.price, 0),
     originalPrice: row.original_price == null ? undefined : number(row.original_price, 0),
     stock: number(row.stock, 0),
-    image: text(row.featured_image, '/icon.png'),
-    tag: tags.join(', ') || undefined,
+    image: text(row.featured_image, text(row.image, '/icon.png')),
+    tag,
+    tagEn: optionalText(row.tag_en),
     description: text(row.description, text(row.short_description, '')),
     descriptionEn: optionalText(row.description_en),
     sizes: stringArray(row.sizes),
     colors: stringArray(row.colors),
     galleryImages: stringArray(row.gallery_images),
     rating: row.rating == null ? undefined : number(row.rating, 0),
-    reviewCount: row.reviews_count == null ? undefined : number(row.reviews_count, 0),
+    reviewCount: row.reviews_count == null
+      ? row.review_count == null ? undefined : number(row.review_count, 0)
+      : number(row.reviews_count, 0),
     materials: optionalText(row.materials),
-    details: optionalText(row.details_material),
+    details: optionalText(row.details_material) ?? optionalText(row.details),
     createdAt: optionalText(row.created_at),
   })
 }
@@ -266,9 +268,9 @@ async function fetchSupabaseProducts(): Promise<StoredProduct[]> {
       const page = await Promise.race([
         client
           .from('products')
-          .select(PRODUCT_SELECT_COLUMNS)
+          .select('*')
           .order('created_at', { ascending: false })
-          .order('id', { ascending: true })
+          .order('id', { ascending: false })
           .range(offset, offset + PRODUCT_PAGE_SIZE - 1)
           .abortSignal(controller.signal),
         timeout,
