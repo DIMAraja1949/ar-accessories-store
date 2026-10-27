@@ -8,7 +8,7 @@ const PRODUCTS_CHANNEL_NAME = 'ar-products-sync'
 const PRODUCT_PAGE_SIZE = 100
 const PRODUCT_FETCH_TIMEOUT_MS = 4500
 const PRODUCT_SELECT_COLUMNS =
-  'id,name,name_en,category,price,original_price,stock,image,tag,tag_en,description,description_en,sizes,colors,gallery_images,rating,review_count,materials,details,created_at'
+  'id,title,title_en,category,price,original_price,stock,featured_image,tags,description,description_en,short_description,sizes,colors,gallery_images,rating,reviews_count,materials,details_material,created_at'
 let supabaseProductsRequest: Promise<StoredProduct[]> | null = null
 let productMutationRevision = 0
 const PRODUCT_CATEGORIES = [
@@ -89,24 +89,24 @@ export interface ProductStoreAdapter {
 
 type SupabaseProductRow = {
   id: string
-  name: string
-  name_en: string | null
+  title: string
+  title_en: string | null
   category: string
   price: number
   original_price: number | null
   stock: number
-  image: string
-  tag: string | null
-  tag_en: string | null
+  featured_image: string
+  tags: string[]
   description: string | null
   description_en: string | null
+  short_description: string | null
   sizes: string[]
   colors: string[]
   gallery_images: string[]
   rating: number | null
-  review_count: number | null
+  reviews_count: number | null
   materials: string | null
-  details: string | null
+  details_material: string | null
   created_at: string
 }
 
@@ -121,57 +121,56 @@ function fromSupabaseRow(row: Record<string, unknown>, index: number): StoredPro
   }
   const stringArray = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  const tags = stringArray(row.tags)
 
   return normalizeProduct({
     id: text(row.id, `product-${index}`),
-    name: text(row.name, 'Untitled product'),
-    nameEn: optionalText(row.name_en),
+    name: text(row.title, 'Untitled product'),
+    nameEn: optionalText(row.title_en),
     category: text(row.category, 'Accessories'),
     price: number(row.price, 0),
     originalPrice: row.original_price == null ? undefined : number(row.original_price, 0),
     stock: number(row.stock, 0),
-    image: text(row.image, '/icon.png'),
-    tag: optionalText(row.tag),
-    tagEn: optionalText(row.tag_en),
-    description: text(row.description, ''),
+    image: text(row.featured_image, '/icon.png'),
+    tag: tags.join(', ') || undefined,
+    description: text(row.description, text(row.short_description, '')),
     descriptionEn: optionalText(row.description_en),
     sizes: stringArray(row.sizes),
     colors: stringArray(row.colors),
     galleryImages: stringArray(row.gallery_images),
     rating: row.rating == null ? undefined : number(row.rating, 0),
-    reviewCount: row.review_count == null ? undefined : number(row.review_count, 0),
+    reviewCount: row.reviews_count == null ? undefined : number(row.reviews_count, 0),
     materials: optionalText(row.materials),
-    details: optionalText(row.details),
+    details: optionalText(row.details_material),
     createdAt: optionalText(row.created_at),
   })
 }
 
 type SupabaseProductWrite = Pick<
   SupabaseProductRow,
-  'id' | 'name' | 'category' | 'price' | 'stock' | 'image'
-> & Partial<Omit<SupabaseProductRow, 'id' | 'name' | 'category' | 'price' | 'stock' | 'image'>>
+  'id' | 'title' | 'category' | 'price' | 'stock' | 'featured_image'
+> & Partial<Omit<SupabaseProductRow, 'id' | 'title' | 'category' | 'price' | 'stock' | 'featured_image'>>
 
 function sanitizeProductForSupabase(product: StoredProduct): SupabaseProductWrite {
   return {
     id: product.id,
-    name: product.name,
+    title: product.name,
     category: normalizeProductCategory(product.category ?? 'Accessories'),
     price: product.price,
     stock: product.stock ?? 0,
-    image: product.image,
+    featured_image: product.image,
     sizes: product.sizes ?? [],
     colors: product.colors ?? [],
     gallery_images: product.galleryImages ?? [],
-    ...(product.nameEn !== undefined ? { name_en: product.nameEn } : {}),
+    ...(product.nameEn !== undefined ? { title_en: product.nameEn } : {}),
     ...(product.originalPrice !== undefined ? { original_price: product.originalPrice } : {}),
-    ...(product.tag !== undefined ? { tag: product.tag } : {}),
-    ...(product.tagEn !== undefined ? { tag_en: product.tagEn } : {}),
+    ...(product.tag !== undefined ? { tags: product.tag.split(',').map(tag => tag.trim()).filter(Boolean) } : {}),
     ...(product.description !== undefined ? { description: product.description } : {}),
     ...(product.descriptionEn !== undefined ? { description_en: product.descriptionEn } : {}),
     ...(product.rating !== undefined ? { rating: product.rating } : {}),
-    ...(product.reviewCount !== undefined ? { review_count: product.reviewCount } : {}),
+    ...(product.reviewCount !== undefined ? { reviews_count: product.reviewCount } : {}),
     ...(product.materials !== undefined ? { materials: product.materials } : {}),
-    ...(product.details !== undefined ? { details: product.details } : {}),
+    ...(product.details !== undefined ? { details_material: product.details } : {}),
     ...(product.createdAt !== undefined ? { created_at: product.createdAt } : {}),
   }
 }
