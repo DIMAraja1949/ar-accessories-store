@@ -141,6 +141,13 @@ function AdminDashboardRoute() {
     setSyncingProducts(true)
     try {
       const rows = await fetchProducts()
+      if (rows.length === 0) {
+        console.warn('Supabase product sync returned no rows. Check the configured project, products table contents, and public SELECT policy.')
+        toast.error('قاعدة البيانات ما رجعات حتى منتج.', {
+          description: 'تأكد من المشروع المحدد، وجود منتجات في جدول products، وتطبيق صلاحية القراءة للزوار.',
+        })
+        return
+      }
       toast.success(`تمت مزامنة ${rows.length} منتج من قاعدة البيانات.`)
     } catch (error) {
       toast.error('تعذرت مزامنة المنتجات من قاعدة البيانات.', {
