@@ -4,7 +4,6 @@ import { ArrowRight, Banknote, BookOpen, Headphones, Home, Info, Menu, Minus, Pl
 import { toast } from 'sonner'
 import { OptimizedImage } from '@/components/OptimizedImage'
 import {
-  getCachedProducts,
   getStoredProducts,
   normalizeProductCategory,
   STOREFRONT_PRODUCTS_QUERY_KEY,
@@ -60,52 +59,34 @@ const categoryLabels: Record<string, { ar: string; en: string }> = {
 
 const formatPrice = (price: number) => `${price.toLocaleString('fr-MA')} DH`
 const cartLineKey = (line: CartLine) => JSON.stringify([line.id, line.size ?? '', line.color ?? ''])
-const STOREFRONT_PRODUCTS_CACHE_KEY = 'ar-storefront-products'
-const PRODUCT_STALE_TIME = 1000 * 60 * 5
 const PRODUCT_GC_TIME = 1000 * 60 * 30
 
 async function fetchStorefrontProducts(): Promise<Product[]> {
-  const products = mapStoredProducts(await getStoredProducts())
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(STOREFRONT_PRODUCTS_CACHE_KEY, JSON.stringify({
-        products,
-        updatedAt: Date.now(),
-      }))
-    } catch (error) {
-      console.warn('Failed to persist storefront products:', error)
-    }
-  }
-  return products
+  return mapStoredProducts(await getStoredProducts())
 }
 
 function storefrontProductQueryOptions() {
   return {
     queryKey: STOREFRONT_PRODUCTS_QUERY_KEY,
     queryFn: fetchStorefrontProducts,
-    staleTime: PRODUCT_STALE_TIME,
+    staleTime: 0,
     gcTime: PRODUCT_GC_TIME,
   }
 }
 
 export const Route = createFileRoute('/')({
+  staleTime: 0,
   loader: async () => {
-    const queryProducts = queryClient.getQueryData<Product[]>(STOREFRONT_PRODUCTS_QUERY_KEY)
     try {
+      const products = await fetchStorefrontProducts()
+      queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, products)
       return {
-        products: await queryClient.fetchQuery({
-          ...storefrontProductQueryOptions(),
-          staleTime: 0,
-        }),
+        products,
         loadError: false,
       }
     } catch (error) {
       console.error('Failed to load storefront products from Supabase:', error)
-      const persistedProducts = mapStoredProducts(getCachedProducts() ?? [])
-      return {
-        products: persistedProducts.length > 0 ? persistedProducts : queryProducts ?? [],
-        loadError: true,
-      }
+      return { products: [] as Product[], loadError: true }
     }
   },
   pendingComponent: StorefrontLoadingFallback,
@@ -263,15 +244,9 @@ function Storefront({
   // Product store notifications refresh the listing and any open Quick View.
   useEffect(() => {
     storefrontMounted.current = true
-    const localProducts = mapStoredProducts(getCachedProducts() ?? [])
-    if (localProducts.length > 0) {
-      setStoreProducts(localProducts)
-      setLoadStatus('ready')
-      queryClient.setQueryData(STOREFRONT_PRODUCTS_QUERY_KEY, localProducts, { updatedAt: 0 })
-    } else {
-      setLoadStatus('loading')
+    if (initialLoadError) {
+      void refreshStoreProducts()
     }
-    void refreshStoreProducts()
     const unsubscribe = subscribeToProducts(scheduleStoreProductRefresh)
     return () => {
       storefrontMounted.current = false
@@ -282,7 +257,7 @@ function Storefront({
       }
       unsubscribe()
     }
-  }, [refreshStoreProducts, scheduleStoreProductRefresh])
+  }, [initialLoadError, refreshStoreProducts, scheduleStoreProductRefresh])
 
   // Remove cart lines whose product no longer exists (only after a successful load)
   useEffect(() => {

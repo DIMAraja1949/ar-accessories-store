@@ -312,29 +312,9 @@ function refreshSupabaseProducts(): Promise<StoredProduct[]> {
   return supabaseProductsRequest
 }
 
-async function getProductsWithFallback(): Promise<StoredProduct[]> {
-  const cachedProducts = readCachedStoredProducts()
-  try {
-    return await refreshSupabaseProducts()
-  } catch (error) {
-    const isStatementTimeout =
-      typeof error === 'object'
-      && error !== null
-      && 'message' in error
-      && typeof error.message === 'string'
-      && /timeout|timed out|canceling statement/i.test(error.message)
-    if (isStatementTimeout) {
-      console.warn('Supabase product query timed out; using cached products.')
-    } else {
-      console.error('Supabase product query failed; using cached products:', error)
-    }
-    return cachedProducts ?? []
-  }
-}
-
 const supabaseProductStore: ProductStoreAdapter = {
   async getProducts() {
-    return getProductsWithFallback()
+    return refreshSupabaseProducts()
   },
   async createProduct(product) {
     const { error } = await requireSupabase()
